@@ -1,0 +1,2029 @@
+<!doctype html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --header: #1c4733;
+      --header-2: #225a40;
+      --line: #e6ece9;
+      --soft: #eef5f1;
+      --panel: #ffffff;
+      --text: #25322c;
+      --muted: #7c8a83;
+      --green: #e9f5ef;
+      --green-2: #2f8f5b;
+      --green-3: #247a4a;
+      --warn: #fff6e0;
+      --bad: #fdeaec;
+      --radius: 14px;
+      --radius-sm: 10px;
+      --shadow: 0 2px 8px rgba(28, 71, 51, .08);
+      --shadow-lg: 0 8px 22px rgba(28, 71, 51, .15);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(900px 500px at 110% -10%, rgba(122, 191, 141, .18), transparent 60%),
+        radial-gradient(700px 460px at -10% 0%, rgba(47, 143, 91, .10), transparent 55%),
+        var(--soft);
+      background-attachment: fixed;
+      color: var(--text);
+      font: 13px/1.45 Arial, Helvetica, sans-serif;
+    }
+
+    header {
+      background: linear-gradient(135deg, var(--header), var(--green-3) 120%);
+      color: #fff;
+      border-bottom: 4px solid #7abf8d;
+      box-shadow: 0 4px 14px rgba(28, 71, 51, .25);
+    }
+
+    .topbar {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 16px 22px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .brand {
+      font-size: 21px;
+      font-weight: 800;
+      letter-spacing: .2px;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+    }
+
+    .brand .logo {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 11px;
+      background: rgba(255, 255, 255, .14);
+      border: 1px solid rgba(255, 255, 255, .28);
+      font-size: 20px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25);
+    }
+
+    .brand small {
+      font-size: 19px;
+      color: #cfe3d8;
+      font-weight: 400;
+    }
+
+    .dev-credit {
+      font-size: 12px;
+      color: #bcd6c7;
+      margin-top: 3px;
+    }
+
+    nav {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    nav button {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      width: 100%;
+      text-align: left;
+      border: 2px solid transparent;
+      background: transparent;
+      color: var(--text);
+      padding: 11px 13px;
+      cursor: pointer;
+      border-radius: var(--radius-sm);
+      font: inherit;
+      font-weight: 600;
+      transition: transform .1s ease, background .12s ease;
+    }
+
+    nav button .nav-ico {
+      width: 26px;
+      height: 26px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      background: var(--green);
+      font-size: 15px;
+      flex: 0 0 auto;
+    }
+
+    nav button:hover { background: var(--green); transform: translateX(3px); }
+    nav button.active {
+      background: linear-gradient(135deg, var(--green-2), var(--green-3));
+      color: #fff;
+      font-weight: 700;
+      border-color: var(--header);
+      box-shadow: 0 3px 0 var(--header);
+    }
+    nav button.active .nav-ico { background: rgba(255, 255, 255, .22); }
+
+    /* ปุ่มทั่วไป = สีกลาง (ขาว) เป็นค่าเริ่มต้น · เป็นสีเขียวเฉพาะตอนกด หรือกะพริบเขียวเป็น feedback */
+    .btn {
+      display: inline-block;
+      text-decoration: none;
+      border: 2px solid #c2cdc7;
+      background: #ffffff;
+      color: var(--text);
+      padding: 10px 16px;
+      cursor: pointer;
+      border-radius: 10px;
+      font: inherit;
+      font-weight: 700;
+      box-shadow: 0 3px 0 #dde6e1;
+      transition: background .12s ease, color .12s ease, transform .05s ease, box-shadow .1s ease, border-color .12s ease;
+    }
+
+    .btn:hover { background: #f1f6f3; }
+
+    /* กดค้าง = เขียว · .flash = กะพริบเขียวสั้น ๆ ตอนคลิก (ใส่ด้วย JS) */
+    .btn:active, .btn.flash {
+      background: linear-gradient(135deg, var(--green-2), var(--green-3));
+      color: #fff;
+      border-color: #1f5c3a;
+    }
+    .btn:active { transform: translateY(2px); box-shadow: none; }
+    .btn.flash { box-shadow: 0 3px 0 #1f5c3a; }
+
+    .btn.secondary {
+      border-color: #d3dcd7;
+      box-shadow: 0 3px 0 #e9efeb;
+    }
+    .btn.secondary:hover { background: #f1f6f3; }
+
+    .userbox {
+      text-align: right;
+      font-size: 12px;
+      color: #dbe9e1;
+      white-space: nowrap;
+    }
+
+    .layout {
+      max-width: 1320px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 210px 1fr;
+      gap: 16px;
+      padding: 16px 22px 28px;
+      align-items: start;
+    }
+
+    aside, main {
+      min-width: 0;
+    }
+
+    /* ก่อน login: ซ่อน bar ซ้ายทั้งแถบ เหลือเฉพาะ bar กลาง (หน้า login) */
+    .layout.no-sidebar { grid-template-columns: 1fr; }
+    .layout.no-sidebar .sidebar { display: none; }
+
+    .sidebar { position: sticky; top: 16px; }
+    .sidebar .section { margin-bottom: 14px; }
+    .sidebar .section-body { padding: 10px; }
+    .side-foot { text-align: center; }
+
+    .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .section-title {
+      background: linear-gradient(135deg, #f3f8f5, #eaf4ee);
+      border-bottom: 1px solid var(--line);
+      border-left: 5px solid var(--green-2);
+      padding: 13px 16px;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--header);
+      letter-spacing: .2px;
+    }
+
+    .section-body { padding: 12px; }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(90px, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .stat {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-top: 4px solid var(--green-2);
+      border-radius: var(--radius-sm);
+      padding: 11px 12px;
+      min-height: 70px;
+      box-shadow: var(--shadow);
+      transition: transform .1s ease, box-shadow .1s ease;
+    }
+
+    .stat:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+
+    .stat strong {
+      display: block;
+      font-size: 28px;
+      line-height: 1.1;
+      font-weight: 800;
+      color: var(--header);
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      table-layout: fixed;
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 9px 11px;
+      text-align: left;
+      vertical-align: middle;
+      overflow-wrap: anywhere;
+    }
+
+    th {
+      background: linear-gradient(180deg, #eef6f1, #e4f0e9);
+      cursor: pointer;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--header);
+      white-space: nowrap;
+    }
+
+    tbody tr:hover td { background: #f3faf6; }
+
+    .table-wrap {
+      overflow: auto;
+      max-height: 470px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+    }
+
+    .tabs-note, .muted {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    textarea, input, select {
+      width: 100%;
+      border: 1px solid #c8d0cc;
+      padding: 8px;
+      font: inherit;
+      background: #fff;
+      border-radius: 2px;
+    }
+
+    textarea { min-height: 132px; resize: vertical; }
+
+    .row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 5px 13px;
+      border-radius: 999px;
+      background: var(--green);
+      color: var(--green-3);
+      border: 1px solid #bfe0cd;
+      font-size: 12px;
+      font-weight: 700;
+      box-shadow: var(--shadow);
+    }
+
+    td .btn, td .btn.secondary { padding: 6px 10px; font-size: 13px; border-radius: 7px; box-shadow: 0 2px 0 #dde6e1; }
+    /* ปุ่มในเซลล์ตาราง = อยู่แถวเดียวเสมอ (ไม่ตัดบรรทัด) */
+    td.actions { flex-wrap: nowrap; gap: 6px; white-space: nowrap; }
+    /* ตารางที่แก้ไขได้ ใช้ความกว้างตามเนื้อหา เพื่อให้คอลัมน์ "จัดการ" มีที่พอ */
+    table.tbl-auto { table-layout: auto; width: 100%; }
+    table.tbl-auto td, table.tbl-auto th { white-space: nowrap; }
+    table.tbl-auto td input { min-width: 120px; }
+
+    /* Training: เลือกกลุ่ม + ตัวเลือกแบบคลิก */
+    .gbtn { display: inline-block; border: 2px solid #1f5c3a; background: #fff; color: #1f5c3a; border-radius: 10px; padding: 10px 16px; margin: 4px 8px 4px 0; cursor: pointer; font-weight: 700; }
+    .gbtn.sel { background: var(--green-2); color: #fff; }
+    .choice-row { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+    .choice-row input[type="radio"] { width: 20px; height: 20px; cursor: pointer; flex: 0 0 auto; }
+    .choice-row .qchoice { flex: 1; }
+    .choice-row .ctag { font-size: 12px; color: var(--muted); white-space: nowrap; }
+    input[type="checkbox"] { width: auto; }
+    .topic-check { display: inline-flex; align-items: center; gap: 6px; margin: 4px 18px 4px 0; }
+
+    .pill.warn { background: var(--warn); color: #7a5a00; border-color: #e6d08d; }
+    .pill.bad { background: var(--bad); color: #842029; border-color: #e5a4aa; }
+
+    .hidden { display: none !important; }
+
+    .message {
+      margin: 8px 0;
+      padding: 8px 10px;
+      border: 1px solid #b9dbc5;
+      background: var(--green);
+      color: #174d33;
+    }
+
+    .message.error {
+      border-color: #e5a4aa;
+      background: var(--bad);
+      color: #842029;
+    }
+
+    .training {
+      max-width: 860px;
+      margin: 22px auto;
+      padding: 0 16px;
+    }
+
+    .training h1 {
+      margin: 0;
+      font-size: 26px;
+    }
+
+    .quiz {
+      display: grid;
+      gap: 8px;
+    }
+
+    .quiz button {
+      text-align: left;
+      background: #fff;
+      border: 1px solid var(--line);
+      color: var(--text);
+      padding: 10px;
+      cursor: pointer;
+    }
+    .quiz button.sel { border-color: var(--green-2); background: var(--green); }
+    .quiz button.ok { border-color: #2e7d32; background: #e6f4ea; }
+    .quiz button.no { border-color: #c62828; background: #fdecea; }
+    .quiz-item { margin: 14px 0; padding-bottom: 6px; border-bottom: 1px dashed var(--line); }
+    .qfb { font-size: 13px; margin-top: 6px; }
+    .qfb.ok { color: #2e7d32; }
+    .qfb.no { color: #c62828; }
+
+    .calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 12px; }
+    .cal-dow { text-align: center; font-weight: 700; color: var(--muted); padding: 4px 0; }
+    .cal-day { position: relative; border: 2px solid var(--line); border-radius: 8px; min-height: 58px; padding: 6px; cursor: pointer; background: #fff; }
+    .cal-day:hover { border-color: var(--green-2); }
+    .cal-day .cal-num { font-weight: 700; }
+    .cal-day.on { background: var(--green-2); border-color: #1f5c3a; color: #fff; }
+    .cal-day.today { outline: 3px solid #f0c419; outline-offset: -1px; }
+    .cal-day.past { background: #f3f4f6; color: #b8b8b8; cursor: not-allowed; border-style: dashed; }
+    .cal-day.sel { box-shadow: 0 0 0 3px #2f8f5b inset; border-color: #1f5c3a; }
+
+    /* หน้าจำลองอ่านเมลสไตล์ Outlook */
+    .ol { border: 1px solid #d8e0ea; border-radius: 8px; overflow: hidden; background: #fff; box-shadow: var(--shadow); margin-top: 10px; }
+    .ol-bar { display: flex; gap: 8px; align-items: center; background: #0f6cbd; color: #fff; padding: 8px 14px; font-size: 13px; }
+    .ol-bar .ol-btn { background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.32); border-radius: 5px; padding: 3px 10px; }
+    .ol-subject { font-size: 19px; font-weight: 700; color: #201f1e; padding: 14px 18px 4px; }
+    .ol-meta { display: flex; gap: 12px; align-items: center; padding: 6px 18px 14px; border-bottom: 1px solid #edebe9; }
+    .ol-ava { width: 40px; height: 40px; border-radius: 50%; background: #0f6cbd; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; flex: 0 0 auto; }
+    .ol-from { font-size: 13px; color: #201f1e; }
+    .ol-to { color: #605e5c; font-size: 12px; }
+    .ol-warn { background: #fff4ce; border-top: 1px solid #f2d98e; color: #7a5a00; font-size: 12px; padding: 8px 18px; }
+    .ol-body { padding: 18px; }
+    .cal-badge { position: absolute; right: 6px; bottom: 6px; background: #fff; color: #1f5c3a; border: 1px solid #1f5c3a; border-radius: 10px; padding: 0 7px; font-size: 12px; font-weight: 700; }
+    .cal-info { position: absolute; left: 5px; right: 5px; bottom: 4px; font-size: 11px; font-weight: 700; color: #fff; line-height: 1.18; }
+    .cal-info small { display: block; font-weight: 600; font-size: 10px; opacity: .92; }
+    .cal-info.done small { color: #d8ffe6; }
+    .cal-day.past .cal-info { color: #5a5a5a; }
+    .cal-day.past .cal-info.done small { color: #3f7a57; }
+
+    @media (max-width: 980px) {
+      .topbar { grid-template-columns: 1fr; }
+      .userbox { text-align: left; }
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; }
+      nav { flex-direction: row; flex-wrap: wrap; }
+      nav button { width: auto; }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .row { grid-template-columns: 1fr; }
+    }
+
+    @media print {
+      .topbar, .sidebar, .rightbar, nav, .noprint { display: none !important; }
+      .layout { grid-template-columns: 1fr; display: block; }
+      main { padding: 0; }
+      .view.hidden { display: none !important; }
+      .section { break-inside: avoid; box-shadow: none; }
+      body { background: #fff; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <div class="topbar">
+        <div>
+          <div class="brand"><span class="logo">🛡️</span>JOJO+ <small>Phishing Simulation</small></div>
+          <div class="dev-credit">พัฒนาโดย sunart.srisumal@gmail.com</div>
+        </div>
+        <div class="userbox" id="userbox">กำลังโหลด...</div>
+      </div>
+    </header>
+
+    <div class="layout no-sidebar">
+      <aside class="sidebar">
+        <div class="section">
+          <div class="section-title">เมนู</div>
+          <div class="section-body"><nav id="nav"></nav></div>
+        </div>
+        <div class="section" id="backupCard">
+          <div class="section-title">💾 สำรองข้อมูล</div>
+          <div class="section-body" style="display:flex;flex-direction:column;gap:8px;">
+            <button class="btn" style="width:100%" onclick="exportData()">⬇ ดาวน์โหลดข้อมูล (Excel)</button>
+            <button class="btn secondary" style="width:100%" onclick="exportLogs()">📄 ดาวน์โหลด Log</button>
+            <div id="backupMsg" class="muted" style="text-align:center;"></div>
+          </div>
+        </div>
+        <div class="section" id="roleCard">
+          <div class="section-body side-foot">บทบาท: <span id="rolePill" class="pill">...</span></div>
+        </div>
+      </aside>
+
+      <main>
+        <section id="Login Customer" class="view"></section>
+        <section id="Email List" class="view hidden"></section>
+        <section id="Mail Topics" class="view hidden"></section>
+        <section id="Training Page" class="view hidden"></section>
+        <section id="Results" class="view hidden"></section>
+        <section id="Report" class="view hidden"></section>
+        <section id="Quota" class="view hidden"></section>
+        <section id="Schedule" class="view hidden"></section>
+      </main>
+
+    </div>
+  </div>
+
+  <div id="trainingApp" class="training hidden"></div>
+
+  <!-- SheetJS — อ่าน/เขียนไฟล์ Excel (.xlsx) ฝั่งเบราว์เซอร์ รองรับภาษาไทย -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <script>
+    const state = {
+      active: 'Login Customer',
+      data: null,
+      entered: false,
+      nav: ['Login Customer', 'Results', 'Report', 'Quota', 'Schedule', 'Email List', 'Mail Topics', 'Training Page']
+    };
+
+    const NAV_LABELS = {
+      'Login Customer': 'Login',
+      'Report': 'Report',
+      'Quota': 'Quota',
+      'Schedule': 'Schedule',
+      'Email List': 'Email',
+      'Mail Topics': 'Topics',
+      'Training Page': 'Training',
+      'Results': 'Result'
+    };
+
+    const NAV_ICONS = {
+      'Login Customer': '🔑',
+      'Results': '📊',
+      'Report': '📈',
+      'Quota': '⚡',
+      'Schedule': '📅',
+      'Email List': '✉️',
+      'Mail Topics': '🎯',
+      'Training Page': '🎓'
+    };
+
+    const params = new URLSearchParams(location.search);
+    const isTrainingRoute = params.get('page') === 'training';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // กะพริบเขียวให้ทุกปุ่ม .btn ตอนคลิก เป็น feedback ของ action
+      document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.btn');
+        if (!btn) return;
+        btn.classList.add('flash');
+        setTimeout(() => btn.classList.remove('flash'), 220);
+      });
+      if (isTrainingRoute) {
+        renderTrainingStandalone();
+        return;
+      }
+      renderNav();
+      loadData();
+    });
+
+    function loadData() {
+      const watchdog = setTimeout(() => {
+        showFatal('ติดต่อ server ไม่สำเร็จใน 30 วินาที — ตรวจ Authorization (เปิดครั้งแรกต้องกด Authorize) หรือ Deploy version. ดู Apps Script > Executions ว่ามี getBootstrap หรือไม่');
+      }, 30000);
+      google.script.run
+        .withSuccessHandler((data) => {
+          clearTimeout(watchdog);
+          if (!data || !data.user) {
+            showFatal('getBootstrap คืนค่า null/ไม่มี user — ตรวจ: (1) มีไฟล์ .gs ซ้ำหรือไม่ ต้องเหลือ Code.gs ไฟล์เดียว (2) รัน getBootstrap ใน editor ดูว่า error หรือไม่ (3) ใช้ URL /dev');
+            return;
+          }
+          try {
+            state.data = data;
+            renderAll();
+          } catch (err) {
+            showFatal('Render error: ' + (err && err.message ? err.message : String(err)));
+          }
+        })
+        .withFailureHandler((err) => {
+          clearTimeout(watchdog);
+          showFatal('Server error (getBootstrap): ' + (err && err.message ? err.message : String(err)));
+        })
+        .getBootstrap();
+    }
+
+    function renderAll() {
+      renderUser();
+      renderNav();
+      renderLogin();
+      renderEmailList();
+      renderTopics();
+      renderTrainingPanel();
+      renderResults();
+      showView(state.active);
+    }
+
+    function isAuthed() {
+      const u = state.data && state.data.user;
+      const registered = !!(u && (u.role === 'admin' || u.role === 'customer'));
+      return registered && state.entered;
+    }
+
+    function renderNav() {
+      const nav = document.getElementById('nav');
+      const tabs = isAuthed() ? state.nav : ['Login Customer'];
+      nav.innerHTML = tabs.map((name) =>
+        `<button type="button" class="${state.active === name ? 'active' : ''}" onclick="showView('${escapeAttr(name)}')"><span class="nav-ico">${NAV_ICONS[name] || '•'}</span>${escapeHtml(NAV_LABELS[name] || name)}</button>`
+      ).join('');
+    }
+
+    function showView(name) {
+      if (name !== 'Login Customer' && !isAuthed()) name = 'Login Customer';
+      state.active = name;
+      document.querySelectorAll('.view').forEach((el) => el.classList.add('hidden'));
+      document.getElementById(name).classList.remove('hidden');
+      renderNav();
+      // ซ่อน bar ซ้ายทั้งแถบจนกว่าจะ login ผ่าน bar กลาง (เห็น bar กลางก่อนเสมอ)
+      const layout = document.querySelector('.layout');
+      if (layout) layout.classList.toggle('no-sidebar', !isAuthed());
+      if (name === 'Report' && isAuthed()) renderReport();
+      if (name === 'Quota' && isAuthed()) renderQuota();
+      if (name === 'Schedule' && isAuthed()) renderSchedule();
+      google.script.run.logClientAction('OPEN_TAB', 'OK', name);
+    }
+
+    function enterApp() {
+      state.entered = true;
+      renderUser();
+      showView('Results');
+    }
+
+    function roleLabel(role) {
+      return role === 'admin' ? 'ผู้ดูแลระบบ (admin)' : role === 'customer' ? 'ลูกค้า (customer)' : role;
+    }
+
+    function renderUser() {
+      const user = state.data.user;
+      const authed = isAuthed();
+      document.getElementById('userbox').innerHTML = authed
+        ? `<div>👤 ${escapeHtml(user.email || '-')}</div>
+           <div>สิทธิ์: <b>${escapeHtml(roleLabel(user.role))}</b>${user.customer_id ? ' · ' + escapeHtml(user.customer_id) : ''}</div>`
+        : `<div>${escapeHtml(user.email || 'No visible email')}</div>`;
+      const role = document.getElementById('rolePill');
+      role.textContent = user.role;
+      role.className = user.role === 'admin' ? 'pill' : user.role === 'customer' ? 'pill warn' : 'pill bad';
+    }
+
+    function renderHome() {
+      const d = state.data.dashboard;
+      document.getElementById('Home').innerHTML = `
+        ${statsHtml(d)}
+        <div class="section">
+          <div class="section-title">Home Dashboard</div>
+          <div class="section-body">
+            <div class="table-wrap">${tableHtml(state.data.queue, ['customer_id','email','topic','send_date','status','retry_count'])}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderLogin() {
+      const u = state.data.user;
+      const registered = (u.role === 'admin' || u.role === 'customer');
+      const chooser = 'https://accounts.google.com/AccountChooser?continue=' + encodeURIComponent(location.href);
+      document.getElementById('Login Customer').innerHTML = `
+        <div class="section" style="max-width:440px;margin:48px auto;">
+          <div class="section-title">JOJO+ Phishing Simulation</div>
+          <div class="section-body" style="text-align:center;">
+            <p style="font-size:17px;line-height:1.65;margin:10px 0 22px;color:var(--text);">ระบบฝึกความตระหนักรู้ภัยฟิชชิงภายในองค์กร<br>เข้าสู่ระบบด้วยบัญชี Google เพื่อเริ่มใช้งาน</p>
+            ${registered
+              ? `<p style="margin-bottom:16px;">เข้าใช้งานโดย ${escapeHtml(u.email)} <span class="pill">${escapeHtml(u.role)}</span></p>
+                 <button class="btn" onclick="enterApp()">เข้าใช้งาน →</button>`
+              : `<div class="message error">บัญชี <b>${escapeHtml(u.email || '-')}</b> ยังไม่ได้ลงทะเบียน</div>
+                 <a class="btn" href="${escapeAttr(chooser)}" target="_top">เข้าสู่ระบบด้วย Google</a>`}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSendMail() {
+      const q = state.data.quota || { available: 0, customer_remaining: 0, customer_cap: 0, platform_remaining: 0, platform_cap: 0 };
+      const activeTopics = (state.data.topics || []).filter((t) => String(t.active).toLowerCase() !== 'false');
+      const topicChecks = activeTopics.length
+        ? activeTopics.map((t) => `<label class="topic-check">
+              <input type="checkbox" class="campaign-topic" value="${escapeAttr(t.topic || '')}" checked>
+              ${escapeHtml(t.topic || '(ไม่มีชื่อ)')} <span class="muted">${escapeHtml(t.category || '-')}</span>
+            </label>`).join('')
+        : '<span class="muted">ยังไม่มีหัวข้อที่เปิดใช้งาน — ไปเปิดที่หน้า Topics ก่อน</span>';
+      const max = Math.max(q.available, 0);
+      document.getElementById('Send Mail').innerHTML = `
+        <div class="stats">
+          ${statHtml('Send Today', q.available)}
+          ${statHtml('You Used', q.customer_today)}
+          ${statHtml('Your Cap', q.customer_cap)}
+          ${statHtml('Platform Left', q.platform_remaining)}
+        </div>
+        <div class="section">
+          <div class="section-title">สร้างแคมเปญจำลอง (Campaign)</div>
+          <div class="section-body">
+            <div class="message">Phase 1 สร้างเฉพาะคิว (ลิงก์ปลายทางเป็นหน้าอบรมเท่านั้น) ยังไม่ส่งอีเมลจริง</div>
+            <p class="muted">โควต้าวันนี้: ส่งได้อีก <b>${Number(q.available)}</b> (เพดานคุณ ${Number(q.customer_remaining)}/${Number(q.customer_cap)} · ทั้งระบบเหลือ ${Number(q.platform_remaining)}/${Number(q.platform_cap)})</p>
+            <label>เลือกหัวข้อที่จะสุ่มส่ง</label>
+            <div style="margin:6px 0 12px;">${topicChecks}</div>
+            <div class="row" style="grid-template-columns:1fr 1fr;">
+              <div>
+                <label>จำนวนที่จะส่ง (สุ่ม)</label>
+                <input id="queueCount" type="number" min="1" max="${max}" value="${max > 0 ? 1 : 0}" ${max > 0 ? '' : 'disabled'}>
+              </div>
+              <div>
+                <label>สถานะ</label>
+                <input value="queued / training-link-only" readonly>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="btn" onclick="createQueue()" ${max > 0 ? '' : 'disabled'}>สร้างคิวแคมเปญ</button>
+            </div>
+            <div id="sendMsg"></div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">คิวทั้งหมด</div>
+          <div class="section-body"><div class="table-wrap">${tableHtml(state.data.queue, ['customer_id','email','topic','send_date','status','retry_count','last_error'])}</div></div>
+        </div>
+      `;
+    }
+
+    function renderEmailList() {
+      const rows = state.data.emailList || [];
+      const body = rows.map((r) => `
+        <tr>
+          <td><input id="em_email_${r.row_index}" value="${escapeAttr(r.email || '')}"></td>
+          <td><input id="em_name_${r.row_index}" value="${escapeAttr(r.fullname || '')}"></td>
+          <td><input id="em_dept_${r.row_index}" value="${escapeAttr(r.department || '')}"></td>
+          <td>${escapeHtml(r.status || '')}</td>
+          <td class="actions">
+            <button class="btn" onclick="saveEmail(${r.row_index})">บันทึก</button>
+            <button class="btn secondary" onclick="moveEmail(${r.row_index},'up')">↑</button>
+            <button class="btn secondary" onclick="moveEmail(${r.row_index},'down')">↓</button>
+            <button class="btn secondary" onclick="removeEmail(${r.row_index})">ลบ</button>
+          </td>
+        </tr>
+      `).join('');
+      document.getElementById('Email List').innerHTML = `
+        <div class="section">
+          <div class="section-title">เพิ่มรายชื่อ</div>
+          <div class="section-body">
+            <div class="row" style="grid-template-columns:2fr 1fr 1fr auto;">
+              <input id="newEmail" placeholder="อีเมล">
+              <input id="newName" placeholder="ชื่อ">
+              <input id="newDept" placeholder="แผนก">
+              <button class="btn" onclick="addEmail()">เพิ่ม</button>
+            </div>
+            <div id="emailMsg"></div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">อัปโหลดรายชื่อจากภายนอก</div>
+          <div class="section-body">
+            <p class="muted">รูปแบบคอลัมน์ (แถวแรกเป็นหัวตาราง): <b>email, fullname, department</b> · รองรับไฟล์ Excel (.xlsx) ภาษาไทย</p>
+            <div class="actions" style="margin-bottom:8px;">
+              <button class="btn secondary" onclick="downloadEmailTemplate()">⬇ ดาวน์โหลดเทมเพลต Excel</button>
+            </div>
+            <div class="row" style="grid-template-columns:1fr auto;">
+              <input type="file" id="emailXlsxFile" accept=".xlsx,.xls">
+              <button class="btn secondary" onclick="uploadEmailsXlsx()">อัปโหลด Excel (จากเครื่อง)</button>
+            </div>
+            <div class="row" style="grid-template-columns:1fr auto;">
+              <input id="emailSheetUrl" placeholder="วางลิงก์ Google Sheet (ออนไลน์)">
+              <button class="btn secondary" onclick="importEmailsFromSheet()">นำเข้าจาก Google Sheet</button>
+            </div>
+            <div id="emailUpMsg"></div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">รายชื่อเป้าหมาย (${rows.length})</div>
+          <div class="section-body"><div class="table-wrap">
+            <table class="tbl-auto">
+              <thead><tr><th>อีเมล</th><th>ชื่อ</th><th>แผนก</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
+              <tbody>${body || '<tr><td colspan="5" class="muted">ยังไม่มีรายชื่อ</td></tr>'}</tbody>
+            </table>
+          </div></div>
+        </div>
+      `;
+    }
+
+    function renderTopics() {
+      const rows = state.data.topics || [];
+      const base = appBase();
+      const activeCount = rows.filter((r) => String(r.active).toLowerCase() !== 'false').length;
+      const body = rows.map((r) => {
+        const link = `${base}?page=training&t=${encodeURIComponent(r.topic || '')}`;
+        const on = String(r.active).toLowerCase() !== 'false';
+        return `
+        <tr>
+          <td style="text-align:center;"><input type="checkbox" ${on ? 'checked' : ''} onchange="toggleTopic(${r.row_index}, this.checked)" title="เปิด/ปิดใช้งานหัวข้อนี้"></td>
+          <td><input id="tp_topic_${r.row_index}" value="${escapeAttr(r.topic || '')}"></td>
+          <td><input id="tp_cat_${r.row_index}" value="${escapeAttr(r.category || '')}"></td>
+          <td><input id="tp_q_${r.row_index}" value="${escapeAttr(r.question || '')}"></td>
+          <td><input id="tp_ch_${r.row_index}" value="${escapeAttr(r.choices || '')}" placeholder="ตัวเลือก คั่นด้วย |"></td>
+          <td><input id="tp_cor_${r.row_index}" value="${escapeAttr(r.correct || '')}" style="width:55px" placeholder="ข้อถูก"></td>
+          <td style="display:flex;gap:6px;"><input value="${escapeAttr(link)}" readonly onclick="this.select()"><button class="btn secondary" onclick="copyInput(this)">คัดลอก</button></td>
+          <td class="actions">
+            <button class="btn" onclick="saveTopic(${r.row_index})">บันทึก</button>
+            <button class="btn secondary" onclick="moveTopic(${r.row_index},'up')">↑</button>
+            <button class="btn secondary" onclick="moveTopic(${r.row_index},'down')">↓</button>
+            <button class="btn secondary" onclick="removeTopic(${r.row_index})">🗑</button>
+          </td>
+        </tr>`;
+      }).join('');
+      document.getElementById('Mail Topics').innerHTML = `
+        <div class="section">
+          <div class="section-title">เพิ่มหัวข้อ</div>
+          <div class="section-body">
+            <div class="row" style="grid-template-columns:2fr 1fr auto;">
+              <input id="newTopic" placeholder="ชื่อหัวข้อ">
+              <input id="newCat" placeholder="หมวด เช่น factory / customer / scammer">
+              <button class="btn" onclick="addTopic()">เพิ่ม</button>
+            </div>
+            <div id="topicMsg"></div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">ตารางหัวข้อ — ใช้งาน ${activeCount}/${rows.length} หัวข้อ</div>
+          <div class="section-body">
+            <p class="muted">ติ๊ก "ใช้" เพื่อเปิด/ปิดหัวข้อที่จะนำไปสุ่มยิงจำลอง · แก้ข้อความในช่องแล้วกด "บันทึก" · คัดลอกลิงก์จำลองไปทดสอบได้</p>
+            <div class="table-wrap">
+            <table class="tbl-auto">
+              <thead><tr><th style="width:46px;">ใช้</th><th>หัวข้อ</th><th>หมวด</th><th>คำถาม</th><th>ตัวเลือก</th><th>ข้อถูก</th><th>ลิงก์จำลอง</th><th>จัดการ</th></tr></thead>
+              <tbody>${body || '<tr><td colspan="8" class="muted">ยังไม่มีหัวข้อ</td></tr>'}</tbody>
+            </table>
+          </div></div>
+        </div>
+      `;
+    }
+
+    function renderTrainingPanel() {
+      const base = appBase();
+      const groups = state.data.questionGroups || [];
+      const questions = state.data.questions || [];
+      const cid = (state.data.user && state.data.user.customer_id) || '';
+      if (!state.qForm) state.qForm = { group: (groups[0] && groups[0].code) || 'link', choices: 2 };
+
+      const groupCards = groups.map((g) => {
+        const link = `${base}?page=training&g=${encodeURIComponent(g.code)}&c=${encodeURIComponent(cid)}`;
+        return `<tr>
+          <td>${escapeHtml(g.label)}</td>
+          <td style="text-align:center;font-weight:700;">${Number(g.count)}</td>
+          <td class="actions">
+            <button class="btn" data-link="${escapeAttr(link)}" onclick="openLink(this)">▶ เปิดแบบทดสอบ</button>
+            <button class="btn secondary" data-link="${escapeAttr(link)}" onclick="copyLink(this)">คัดลอกลิงก์</button>
+          </td>
+        </tr>`;
+      }).join('');
+
+      // ปุ่มเลือกกลุ่ม (คลิก)
+      const groupBtns = groups.map((g) =>
+        `<button type="button" class="gbtn${state.qForm.group === g.code ? ' sel' : ''}" data-g="${escapeAttr(g.code)}" onclick="selectQGroup('${escapeAttr(g.code)}')">${escapeHtml(g.label)}</button>`
+      ).join('');
+
+      // แถวตัวเลือก (คลิก radio = ข้อที่ถูก)
+      let choiceRows = '';
+      for (let i = 1; i <= state.qForm.choices; i++) {
+        choiceRows += `<div class="choice-row">
+          <input type="radio" name="qcorrect" value="${i}" ${i === 1 ? 'checked' : ''} title="คลิกถ้าข้อนี้คือคำตอบที่ถูก">
+          <input class="qchoice" placeholder="ตัวเลือกที่ ${i}">
+          <span class="ctag">◀ คลิกวงกลมซ้ายถ้าข้อนี้ถูก</span>
+        </div>`;
+      }
+
+      const groupLabel = (code) => (groups.find((g) => g.code === code) || {}).label || code;
+      // แบ่งหน้า 20 ข้อ/หน้า · ปุ่มจัดการแสดงเฉพาะคำถามของหน่วยงานตัวเอง (admin จัดการได้ทุกข้อ)
+      const isAdmin = !!(state.data.user && state.data.user.role === 'admin');
+      const Q_PER_PAGE = 20;
+      const totalQ = questions.length;
+      const qPages = Math.max(1, Math.ceil(totalQ / Q_PER_PAGE));
+      if (state.qPage == null) state.qPage = 0;
+      if (state.qPage >= qPages) state.qPage = qPages - 1;
+      if (state.qPage < 0) state.qPage = 0;
+      const qStart = state.qPage * Q_PER_PAGE;
+      const body = questions.slice(qStart, qStart + Q_PER_PAGE).map((r, idx) => {
+        const owned = isAdmin || String(r.customer_id) === cid;
+        return `
+        <tr>
+          <td style="text-align:center;color:#7c8a83;">${qStart + idx + 1}</td>
+          <td>${escapeHtml(groupLabel(r.group))}</td>
+          <td>${escapeHtml(r.question || '')}</td>
+          <td>${escapeHtml((splitPipe(r.choices))[Number(r.correct) - 1] || '')}</td>
+          <td class="actions">${owned
+            ? `<label class="topic-check"><input type="checkbox" ${String(r.active).toLowerCase() !== 'false' ? 'checked' : ''} onchange="toggleQuestionActive(${r.row_index}, this.checked)"> ใช้</label>
+               <button class="btn secondary" onclick="removeQuestion(${r.row_index})">🗑</button>`
+            : `<span class="pill">คลังกลาง</span>`}</td>
+        </tr>`;
+      }).join('');
+
+      document.getElementById('Training Page').innerHTML = `
+        <div class="section">
+          <div class="section-title">คลังคำถามทดสอบ — สุ่ม 3 ข้อต่อครั้ง (ผ่านเมื่อตอบถูกครบ)</div>
+          <div class="section-body">
+            <p class="muted">นี่คือชุดคำถามที่จะสุ่มไปทดสอบพนักงาน · คัดลอกลิงก์ของแต่ละกลุ่มไปใช้ได้ · ลิงก์จบที่หน้าอบรมเสมอ</p>
+            <div class="table-wrap"><table class="tbl-auto">
+              <thead><tr><th>กลุ่ม</th><th>จำนวนข้อ</th><th>แบบทดสอบ</th></tr></thead>
+              <tbody>${groupCards || '<tr><td colspan="3" class="muted">ยังไม่มีกลุ่ม</td></tr>'}</tbody>
+            </table></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">➕ เพิ่มคำถามใหม่ (คลิกเลือกได้เลย ไม่ต้องพิมพ์สัญลักษณ์)</div>
+          <div class="section-body">
+            <p><b>1. เลือกกลุ่ม</b> (คลิก)</p>
+            <div>${groupBtns}</div>
+            <p style="margin-top:14px;"><b>2. พิมพ์คำถาม</b></p>
+            <input id="nqQuestion" placeholder="เช่น  ได้รับอีเมลให้กดลิงก์ยืนยันบัญชีด่วน ควรทำอย่างไร?">
+            <p style="margin-top:14px;"><b>3. ใส่ตัวเลือก แล้วคลิกวงกลมหน้า "ข้อที่ถูก"</b></p>
+            <div id="choiceBox">${choiceRows}</div>
+            <div class="actions"><button class="btn secondary" onclick="addChoiceRow()">+ เพิ่มตัวเลือก</button></div>
+            <p style="margin-top:14px;"><b>4. คำอธิบายเมื่อตอบ</b> (ไม่บังคับ)</p>
+            <input id="nqExplain" placeholder="เช่น  อย่ากดลิงก์ในอีเมล ให้เข้าเว็บทางการเองและตรวจสอบก่อน">
+            <div class="actions" style="margin-top:12px;"><button class="btn" onclick="addQuestion()">บันทึกคำถาม</button></div>
+            <div id="qMsg"></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">📄 อัปโหลดทีละหลายข้อ (ไม่บังคับ)</div>
+          <div class="section-body">
+            <p class="muted">คอลัมน์ (แถวแรกเป็นหัวตาราง): <b>group, question, choices, correct, explain</b> (choices คั่นด้วย | · group = ${groups.map((g) => g.code).join(' / ') || 'link/cred/finance/file/social'}) · รองรับ Excel (.xlsx) ภาษาไทย</p>
+            <div class="actions" style="margin-bottom:8px;">
+              <button class="btn secondary" onclick="downloadQuestionTemplate()">⬇ ดาวน์โหลดเทมเพลต Excel</button>
+            </div>
+            <div class="row" style="grid-template-columns:1fr auto;">
+              <input type="file" id="qXlsxFile" accept=".xlsx,.xls">
+              <button class="btn secondary" onclick="uploadQuestionsXlsx()">อัปโหลด Excel</button>
+            </div>
+            <div class="row" style="grid-template-columns:1fr auto;">
+              <input id="sheetUrl" placeholder="วางลิงก์ Google Sheet (ออนไลน์)">
+              <button class="btn secondary" onclick="importFromSheet()">นำเข้าจาก Google Sheet</button>
+            </div>
+            <div id="upMsg"></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">ชุดคำถามทั้งหมด — คลังกลาง + ของหน่วยงาน (${totalQ} ข้อ)</div>
+          <div class="section-body">
+            <p class="muted">ทั้ง admin และ customer เห็นชุดคำถามได้ · "คลังกลาง" คือคำถามที่ใช้ร่วมทุกหน่วยงาน (แก้/ลบได้เฉพาะของหน่วยงานคุณ)</p>
+            <div class="table-wrap">
+            <table class="tbl-auto">
+              <thead><tr><th style="width:42px;">#</th><th>กลุ่ม</th><th>คำถาม</th><th>คำตอบที่ถูก</th><th>จัดการ</th></tr></thead>
+              <tbody>${body || '<tr><td colspan="5" class="muted">ยังไม่มีคำถาม</td></tr>'}</tbody>
+            </table>
+            </div>
+            <div class="actions" style="justify-content:space-between;margin-top:10px;">
+              <button class="btn secondary" onclick="qPageGo(-1)" ${state.qPage <= 0 ? 'disabled' : ''}>‹ ก่อนหน้า</button>
+              <span class="muted">หน้า ${state.qPage + 1}/${qPages} · ทั้งหมด ${totalQ} ข้อ</span>
+              <button class="btn secondary" onclick="qPageGo(1)" ${state.qPage >= qPages - 1 ? 'disabled' : ''}>ถัดไป ›</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function qPageGo(delta) {
+      state.qPage = (state.qPage || 0) + delta;
+      renderTrainingPanel();
+    }
+
+    function selectQGroup(code) {
+      state.qForm.group = code;
+      const panel = document.getElementById('Training Page');
+      if (panel) panel.querySelectorAll('.gbtn').forEach((b) => b.classList.toggle('sel', b.getAttribute('data-g') === code));
+    }
+    function addChoiceRow() {
+      const box = document.getElementById('choiceBox');
+      const n = box.querySelectorAll('.choice-row').length;
+      if (n >= 4) { setMsg('qMsg', 'ใส่ได้สูงสุด 4 ตัวเลือก', true); return; }
+      const i = n + 1;
+      const div = document.createElement('div');
+      div.className = 'choice-row';
+      div.innerHTML = `<input type="radio" name="qcorrect" value="${i}" title="คลิกถ้าข้อนี้คือคำตอบที่ถูก">
+        <input class="qchoice" placeholder="ตัวเลือกที่ ${i}">
+        <span class="ctag">◀ คลิกวงกลมซ้ายถ้าข้อนี้ถูก</span>`;
+      box.appendChild(div);
+    }
+
+    function splitPipe(v) {
+      return String(v || '').split('|').map((s) => s.trim()).filter(Boolean);
+    }
+
+    function renderResults() {
+      document.getElementById('Results').innerHTML = `
+        ${statsHtml(state.data.dashboard)}
+        <div class="section">
+          <div class="section-title">ผลการอบรม / ผลประเมิน</div>
+          <div class="section-body"><div class="table-wrap">${tableHtml(state.data.results, ['email','action','topic','score','action_time'])}</div></div>
+        </div>
+        <div class="section">
+          <div class="section-title">คิวที่กำหนดส่ง</div>
+          <div class="section-body"><div class="table-wrap">${tableHtml(state.data.queue, ['email','topic','send_date','status'])}</div></div>
+        </div>
+      `;
+    }
+
+    function renderReport() {
+      document.getElementById('Report').innerHTML = `
+        <div class="section"><div class="section-title">รายงานผล (Report)</div>
+        <div class="section-body"><p class="muted">กำลังโหลดรายงาน...</p></div></div>`;
+      google.script.run
+        .withSuccessHandler(drawReport)
+        .withFailureHandler((err) => {
+          document.getElementById('Report').innerHTML =
+            `<div class="section"><div class="section-body"><div class="message error">${escapeHtml(err && err.message ? err.message : String(err))}</div></div></div>`;
+        })
+        .getReportData();
+    }
+
+    function drawReport(d) {
+      state.report = d;
+      const f = d.funnel;
+      const q = d.quota || {};
+      const groupRows = (d.groups || []).map((g) => {
+        const rate = g.attempts ? Math.round(g.passed / g.attempts * 100) : 0;
+        return `<tr><td>${escapeHtml(g.label)}</td><td style="text-align:center;">${g.attempts}</td><td style="text-align:center;">${g.passed}</td><td style="text-align:center;">${rate}%</td></tr>`;
+      }).join('');
+      const peopleRows = (d.people || []).map((p) => `
+        <tr>
+          <td>${escapeHtml(p.email || '')}</td>
+          <td>${escapeHtml(p.fullname || '')}</td>
+          <td>${escapeHtml(p.department || '')}</td>
+          <td style="text-align:center;">${p.clicked ? '✔' : '–'}</td>
+          <td style="text-align:center;">${p.trained ? '✔' : '–'}</td>
+          <td style="text-align:center;">${p.passed ? '✔' : '–'}</td>
+          <td style="text-align:center;">${Number(p.score || 0)}</td>
+        </tr>`).join('');
+      document.getElementById('Report').innerHTML = `
+        <div class="actions noprint" style="justify-content:flex-end;">
+          <button class="btn secondary" onclick="exportReportXlsx()">ดาวน์โหลด Excel</button>
+          <button class="btn" onclick="window.print()">พิมพ์ / บันทึก PDF</button>
+        </div>
+        <div class="section">
+          <div class="section-title">สรุปผลแคมเปญ — ${escapeHtml(d.org || '')}</div>
+          <div class="section-body">
+            <div class="stats">
+              ${statHtml('เป้าหมาย', f.targets)}
+              ${statHtml('ส่งคิว', f.sent)}
+              ${statHtml('คลิก', f.clicked)}
+              ${statHtml('อบรม', f.trained)}
+              ${statHtml('ผ่าน', f.passed)}
+              ${statHtml('อัตราผ่าน %', f.passRate)}
+            </div>
+            <p class="muted">อัตราคลิก ${f.clickRate}% · ผ่านในกลุ่มที่อบรม ${f.passOfTrained}%</p>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">ผลแยกตามกลุ่มหัวข้อ</div>
+          <div class="section-body"><div class="table-wrap"><table>
+            <thead><tr><th>กลุ่ม</th><th>จำนวนที่อบรม</th><th>ผ่าน</th><th>อัตราผ่าน</th></tr></thead>
+            <tbody>${groupRows || '<tr><td colspan="4" class="muted">ยังไม่มีข้อมูล</td></tr>'}</tbody>
+          </table></div></div>
+        </div>
+        <div class="section">
+          <div class="section-title">รายคน (${(d.people || []).length})</div>
+          <div class="section-body"><div class="table-wrap"><table>
+            <thead><tr><th>อีเมล</th><th>ชื่อ</th><th>แผนก</th><th>คลิก</th><th>อบรม</th><th>ผ่าน</th><th>คะแนน</th></tr></thead>
+            <tbody>${peopleRows || '<tr><td colspan="7" class="muted">ยังไม่มีรายชื่อ</td></tr>'}</tbody>
+          </table></div></div>
+        </div>
+      `;
+    }
+
+    // หน้า Quota แยกออกมา — โควต้าภายในขึ้นทันที, โควต้า Gmail จริงค่อยโหลด (ช้า)
+    function renderQuota() {
+      const q = (state.data && state.data.quota) || {};
+      const isAdmin = !!(state.data && state.data.user && state.data.user.role === 'admin');
+
+      // Customer: บอกแค่ "ใช้ไป" กับ "เหลือ" ของหน่วยงานตัวเอง ไม่บอกข้อมูลระบบ
+      if (!isAdmin) {
+        document.getElementById('Quota').innerHTML = `
+          <div class="section">
+            <div class="section-title">โควต้าวันนี้</div>
+            <div class="section-body">
+              <div class="stats" style="grid-template-columns:repeat(2,minmax(0,1fr));">
+                ${statHtml('ใช้ไปแล้ววันนี้', q.customer_today)}
+                ${statHtml('ส่งได้อีก', q.available)}
+              </div>
+              <p class="muted">นับเฉพาะการส่งของหน่วยงานคุณในวันนี้</p>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      // Admin: เห็นภาพรวมทั้งระบบ + โควต้า Gmail จริง
+      document.getElementById('Quota').innerHTML = `
+        <div class="section">
+          <div class="section-title">โควต้าวันนี้ (ภาพรวมระบบ)</div>
+          <div class="section-body">
+            <div class="stats">
+              ${statHtml('ส่งได้อีก', q.available)}
+              ${statHtml('หน่วยงานใช้ไป', q.customer_today)}
+              ${statHtml('เพดานหน่วยงาน', q.customer_cap)}
+              ${statHtml('ทั้งระบบเหลือ', q.platform_remaining)}
+            </div>
+            <p class="muted">เพดานหน่วยงาน ${Number(q.customer_remaining || 0)}/${Number(q.customer_cap || 0)} ต่อวัน · ทั้งระบบ ${Number(q.platform_remaining || 0)}/${Number(q.platform_cap || 0)} ต่อวัน</p>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">โควต้าส่งเมลจริงของ Google</div>
+          <div class="section-body">
+            <p>เหลือวันนี้: <b id="gQuota">กำลังตรวจสอบ…</b></p>
+            <p class="muted">ดึงจาก Google โดยตรง อาจใช้เวลาสักครู่</p>
+          </div>
+        </div>
+      `;
+      google.script.run
+        .withSuccessHandler((res) => {
+          const el = document.getElementById('gQuota');
+          if (el) el.textContent = (res && res.ok) ? (Number(res.remaining) + ' ฉบับ') : 'ตรวจสอบไม่ได้';
+        })
+        .withFailureHandler(() => {
+          const el = document.getElementById('gQuota');
+          if (el) el.textContent = 'ตรวจสอบไม่ได้';
+        })
+        .getGoogleMailQuota();
+    }
+
+    /* ===== Schedule (ปฏิทิน) ===== */
+    function renderSchedule() {
+      document.getElementById('Schedule').innerHTML =
+        `<div class="section"><div class="section-title">Schedule</div><div class="section-body"><p class="muted">กำลังโหลด...</p></div></div>`;
+      google.script.run
+        .withSuccessHandler((d) => {
+          state.scheduleData = d;
+          if (!state.scheduleMonth) { const t = new Date(); state.scheduleMonth = { y: t.getFullYear(), m: t.getMonth() }; }
+          drawSchedule();
+        })
+        .withFailureHandler((err) => {
+          document.getElementById('Schedule').innerHTML =
+            `<div class="section"><div class="section-body"><div class="message error">${escapeHtml(err && err.message ? err.message : String(err))}</div></div></div>`;
+        })
+        .getSchedule();
+    }
+
+    function schedMonthShift(delta) {
+      let y = state.scheduleMonth.y, m = state.scheduleMonth.m + delta;
+      if (m < 0) { m = 11; y--; }
+      if (m > 11) { m = 0; y++; }
+      state.scheduleMonth = { y, m };
+      drawSchedule();
+    }
+
+    function ymd(y, m, d) { return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0'); }
+
+    function drawSchedule() {
+      const d = state.scheduleData || { days: [], today: '', isAdmin: false, trigger: {} };
+      const y = state.scheduleMonth.y, m = state.scheduleMonth.m;
+      const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+      const byDate = {};
+      (d.days || []).forEach((x) => { byDate[x.date] = x; });
+      const first = new Date(y, m, 1).getDay();
+      const daysInMonth = new Date(y, m + 1, 0).getDate();
+      const dow = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+      let cells = dow.map((w) => `<div class="cal-dow">${w}</div>`).join('');
+      for (let i = 0; i < first; i++) cells += `<div></div>`;
+      for (let day = 1; day <= daysInMonth; day++) {
+        const ds = ymd(y, m, day);
+        const sc = byDate[ds];
+        const isPast = ds < d.today;
+        const cls = ['cal-day'];
+        if (sc) cls.push('on');
+        if (isPast) cls.push('past');
+        if (ds === d.today) cls.push('today');
+        if (ds === state.scheduleSel) cls.push('sel');
+        const isDone = sc && sc.status === 'done';
+        const badge = sc
+          ? `<span class="cal-info${isDone ? ' done' : ''}">✉ ${sc.count}<small>${isDone ? '✓ ส่งแล้ว' : '• รอส่ง'}</small></span>`
+          : '';
+        const click = isPast ? '' : ` onclick="clickScheduleDay('${ds}')"`;
+        cells += `<div class="${cls.join(' ')}"${click}><span class="cal-num">${day}</span>${badge}</div>`;
+      }
+      const adminBox = d.isAdmin ? `
+        <div class="section">
+          <div class="section-title">ระบบยิงอัตโนมัติ (Google Trigger)</div>
+          <div class="section-body">
+            <p>สถานะ: <b>${d.trigger && d.trigger.installed ? 'เปิดอยู่ ✔ (รันทุกวันราว 08:00)' : 'ยังไม่เปิด'}</b></p>
+            <div class="actions">
+              ${d.trigger && d.trigger.installed
+                ? `<button class="btn secondary" onclick="toggleTrigger(false)">ปิดระบบอัตโนมัติ</button>`
+                : `<button class="btn" onclick="toggleTrigger(true)">เปิดระบบอัตโนมัติ</button>`}
+            </div>
+            <div id="trigMsg"></div>
+          </div>
+        </div>` : '';
+      document.getElementById('Schedule').innerHTML = `
+        <div class="section">
+          <div class="section-title">ตั้งเวลายิงจำลอง — คลิกวันที่ในปฏิทิน</div>
+          <div class="section-body">
+            <div class="row" style="grid-template-columns:auto 1fr auto; align-items:center;">
+              <button class="btn secondary" onclick="schedMonthShift(-1)">‹ เดือนก่อน</button>
+              <div style="text-align:center; font-weight:700; font-size:18px;">${monthNames[m]} ${y + 543}</div>
+              <button class="btn secondary" onclick="schedMonthShift(1)">เดือนถัดไป ›</button>
+            </div>
+            <p class="muted">คลิกวันที่ในปฏิทิน → เลือกรายชื่ออีเมลที่จะส่งวันนั้น (สุ่ม / ตามคิว ก็ได้) · ✉ = จำนวนเมลที่จะส่ง · สถานะ รอส่ง / ✓ ส่งแล้ว</p>
+            <div class="actions" style="margin:8px 0;">
+              <button class="btn secondary" onclick="previewTestMail()">👁 ดูแบบจำลอง (เหมือน Outlook · ไม่เสียโควต้า)</button>
+              <button class="btn secondary" onclick="sendTestMail()">✉ ส่งจริงเข้า Gmail ฉัน (เสีย 1 โควต้า)</button>
+              <span id="testMailMsg" class="muted"></span>
+            </div>
+            <div id="testMailPreview"></div>
+            <div class="calendar">${cells}</div>
+            <div id="schedMsg"></div>
+          </div>
+        </div>
+        ${scheduleDetailHtml()}
+        ${adminBox}`;
+    }
+
+    function clickScheduleDay(date) {
+      state.scheduleSel = (state.scheduleSel === date) ? null : date;
+      drawSchedule();
+    }
+
+    // แผงเลือกรายชื่ออีเมลของวันที่เลือก (เลือกจากรายชื่อที่ใส่ไว้ + ปุ่มสุ่ม + ตามคิว)
+    function scheduleDetailHtml() {
+      const date = state.scheduleSel;
+      if (!date) return '';
+      const emails = (state.data && state.data.emailList) || [];
+      const dayRow = ((state.scheduleData && state.scheduleData.days) || []).find((x) => x.date === date);
+      const chosen = {};
+      (dayRow && dayRow.emails ? dayRow.emails : []).forEach((e) => { chosen[String(e).toLowerCase()] = true; });
+      const rows = emails.map((r, i) => `
+        <tr>
+          <td style="text-align:center;color:#7c8a83;">${i + 1}</td>
+          <td style="text-align:center;"><input type="checkbox" class="sched-email" value="${escapeAttr(r.email || '')}" ${chosen[String(r.email).toLowerCase()] ? 'checked' : ''}></td>
+          <td>${escapeHtml(r.email || '')}</td>
+          <td>${escapeHtml(r.fullname || '')}</td>
+          <td>${escapeHtml(r.department || '')}</td>
+        </tr>`).join('');
+      return `
+        <div class="section">
+          <div class="section-title">📅 ตั้งส่งสำหรับวันที่ ${escapeHtml(date)}</div>
+          <div class="section-body">
+            <div class="actions" style="margin-bottom:8px;">
+              <label>จำนวน <input id="schedDayCount" type="number" min="1" max="30" value="${(dayRow && dayRow.count) || 5}" style="width:80px;"></label>
+              <button class="btn secondary" onclick="schedSelect('random')">🎲 สุ่มเลือก</button>
+              <button class="btn secondary" onclick="schedSelect('queue')">📋 ตามคิว (ลำดับแรก)</button>
+              <button class="btn secondary" onclick="schedSelect('clear')">ล้างที่เลือก</button>
+            </div>
+            <div class="table-wrap" style="max-height:300px;">
+              <table class="tbl-auto">
+                <thead><tr><th style="width:42px;">#</th><th style="width:50px;">ส่ง</th><th>อีเมล</th><th>ชื่อ</th><th>แผนก</th></tr></thead>
+                <tbody>${rows || '<tr><td colspan="5" class="muted">ยังไม่มีรายชื่อ — ไปเพิ่มที่หน้า Email ก่อน</td></tr>'}</tbody>
+              </table>
+            </div>
+            <div class="actions" style="margin-top:10px;">
+              <button class="btn" onclick="saveScheduleDay()">บันทึกวันนี้</button>
+              <button class="btn secondary" onclick="clearScheduleDay()">ยกเลิกการส่งวันนี้</button>
+            </div>
+            <div id="schedDayMsg"></div>
+          </div>
+        </div>`;
+    }
+
+    function schedChecks() {
+      return Array.from(document.querySelectorAll('.sched-email'));
+    }
+    function schedSelect(mode) {
+      const boxes = schedChecks();
+      if (mode === 'clear') { boxes.forEach((b) => { b.checked = false; }); return; }
+      const n = Math.max(1, Number((document.getElementById('schedDayCount') || {}).value) || 1);
+      boxes.forEach((b) => { b.checked = false; });
+      let order = boxes.slice();
+      if (mode === 'random') {
+        for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = order[i]; order[i] = order[j]; order[j] = t; }
+      }
+      order.slice(0, n).forEach((b) => { b.checked = true; });
+    }
+    function saveScheduleDay() {
+      const emails = schedChecks().filter((b) => b.checked).map((b) => b.value);
+      if (!emails.length) { setMsg('schedDayMsg', 'เลือกอย่างน้อย 1 รายชื่อ (หรือกดสุ่ม/ตามคิว)', true); return; }
+      callServer('setScheduleDay', { date: state.scheduleSel, emails }, (res) => {
+        state.scheduleData = res; drawSchedule();
+      }, 'schedDayMsg');
+    }
+    function clearScheduleDay() {
+      callServer('setScheduleDay', { date: state.scheduleSel, count: 0 }, (res) => {
+        state.scheduleData = res; state.scheduleSel = null; drawSchedule();
+      }, 'schedMsg');
+    }
+
+    function toggleTrigger(on) {
+      callServer(on ? 'installDailyTrigger' : 'removeDailyTrigger', null, (res) => {
+        if (state.scheduleData) state.scheduleData.trigger = res;
+        drawSchedule();
+      }, 'trigMsg');
+    }
+
+    // ดูตัวอย่างเมลจำลองในหน้าอ่านเมลสไตล์ Outlook (ไม่ส่ง ไม่เสียโควต้า)
+    function previewTestMail() {
+      const box = document.getElementById('testMailPreview');
+      if (box) box.innerHTML = '<p class="muted">กำลังโหลดตัวอย่าง...</p>';
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (!res) { if (box) box.innerHTML = '<div class="message error">โหลดตัวอย่างไม่สำเร็จ</div>'; return; }
+          const initial = String(res.fromName || '?').charAt(0).toUpperCase();
+          box.innerHTML = `
+            <div class="ol">
+              <div class="ol-bar"><span class="ol-btn">↩ ตอบกลับ</span><span class="ol-btn">↪ ส่งต่อ</span><span class="ol-btn">🗑 ลบ</span><span style="margin-left:auto;opacity:.85;">มุมมองจำลอง (Outlook)</span></div>
+              <div class="ol-subject">${escapeHtml(res.subject || '')}</div>
+              <div class="ol-meta">
+                <div class="ol-ava">${escapeHtml(initial)}</div>
+                <div>
+                  <div class="ol-from"><b>${escapeHtml(res.fromName || '')}</b> &lt;${escapeHtml(res.fromEmail || '')}&gt;</div>
+                  <div class="ol-to">ถึง: ${escapeHtml(res.to || '')}</div>
+                </div>
+              </div>
+              <div class="ol-warn">⚠ นี่คือ <b>การจำลอง</b>เพื่อฝึก — ผู้ส่งด้านบนเป็นชื่อ "ลวง" (จุดสังเกตของฟิชชิง) · ลองกดปุ่มในเมลดูว่าพาไปหน้าอบรม</div>
+              <div class="ol-body">${res.html}</div>
+            </div>`;
+        })
+        .withFailureHandler((err) => { if (box) box.innerHTML = `<div class="message error">${escapeHtml(err && err.message ? err.message : String(err))}</div>`; })
+        .previewTestMail();
+    }
+
+    // ทดสอบส่งเมลจริงถึงตัวเอง (ดูเนื้อหา + ตามลิงก์ได้)
+    function sendTestMail() {
+      const el = document.getElementById('testMailMsg');
+      if (el) el.textContent = 'กำลังส่ง...';
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (el) el.textContent = (res && res.ok) ? ('ส่งแล้ว ✔ ไปที่ ' + res.to + ' (เช็คกล่องเมล)') : 'ส่งไม่สำเร็จ';
+        })
+        .withFailureHandler((err) => {
+          if (el) el.textContent = (err && err.message) ? err.message : String(err);
+        })
+        .sendTestMail();
+    }
+
+    function exportReportXlsx() {
+      const d = state.report;
+      if (!d) return;
+      if (typeof XLSX === 'undefined') { alert('ไลบรารี Excel ยังโหลดไม่เสร็จ ลองใหม่อีกครั้ง'); return; }
+      const data = (d.people || []).map((p) => ({
+        email: p.email || '',
+        fullname: p.fullname || '',
+        department: p.department || '',
+        clicked: p.clicked ? 'yes' : 'no',
+        trained: p.trained ? 'yes' : 'no',
+        passed: p.passed ? 'yes' : 'no',
+        score: Number(p.score || 0)
+      }));
+      const ws = XLSX.utils.json_to_sheet(data, { header: ['email', 'fullname', 'department', 'clicked', 'trained', 'passed', 'score'] });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Report');
+      XLSX.writeFile(wb, 'jojo_report_' + (d.org || 'all') + '.xlsx');
+    }
+
+    function renderSettings() {
+      document.getElementById('Settings').innerHTML = `
+        <div class="section">
+          <div class="section-title">Settings</div>
+          <div class="section-body">
+            <p class="muted">Portable design uses the active spreadsheet. No hardcoded Spreadsheet ID.</p>
+            <div class="table-wrap">${tableHtml(state.data.settings, ['key','value','description'])}</div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">Logs</div>
+          <div class="section-body"><div class="table-wrap">${tableHtml(state.data.logs, ['timestamp','customer_id','user_email','role','action','result','error_message'])}</div></div>
+        </div>
+      `;
+    }
+
+    function renderRecentLogs() {
+      const logs = (state.data.logs || []).slice(0, 8);
+      document.getElementById('recentLogs').innerHTML = logs.length
+        ? logs.map((log) => `<div><b>${escapeHtml(log.action)}</b><br>${escapeHtml(log.result)} <span class="muted">${escapeHtml(formatDate(log.timestamp))}</span></div><hr>`).join('')
+        : 'No logs yet';
+    }
+
+    function statsHtml(d) {
+      return `
+        <div class="stats">
+          ${statHtml('Customers', d.customers)}
+          ${statHtml('Users', d.users)}
+          ${statHtml('Sent', d.sent)}
+          ${statHtml('Queue', d.queue)}
+          ${statHtml('Clicked', d.clicked)}
+          ${statHtml('Trained', d.trained)}
+        </div>
+      `;
+    }
+
+    function statHtml(label, value) {
+      return `<div class="stat"><strong>${Number(value || 0)}</strong><span>${escapeHtml(label)}</span></div>`;
+    }
+
+    function tableHtml(rows, columns) {
+      rows = rows || [];
+      if (!rows.length) return '<div class="section-body muted">No data</div>';
+      return `
+        <table data-sort-dir="asc">
+          <thead><tr>${columns.map((c, i) => `<th onclick="sortTable(this, ${i})">${escapeHtml(c)}</th>`).join('')}</tr></thead>
+          <tbody>
+            ${rows.map((row) => `<tr>${columns.map((c) => `<td>${escapeHtml(formatCell(row[c]))}</td>`).join('')}</tr>`).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function sortTable(th, index) {
+      const table = th.closest('table');
+      const tbody = table.querySelector('tbody');
+      const dir = table.dataset.sortDir === 'asc' ? 'desc' : 'asc';
+      table.dataset.sortDir = dir;
+      Array.from(tbody.querySelectorAll('tr'))
+        .sort((a, b) => {
+          const av = a.children[index].textContent.trim();
+          const bv = b.children[index].textContent.trim();
+          return dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+        })
+        .forEach((row) => tbody.appendChild(row));
+    }
+
+    function addEmails() {
+      const text = document.getElementById('emailText').value;
+      setMsg('emailMsg', 'Saving...', false);
+      google.script.run
+        .withSuccessHandler((res) => {
+          state.data.emailList = res.emailList;
+          state.data.dashboard = res.dashboard;
+          renderEmailList();
+          renderResults();
+          setMsg('emailMsg', `Added ${res.added}. Rejected ${res.rejected.length}.`, false);
+        })
+        .withFailureHandler((err) => setMsg('emailMsg', err.message || String(err), true))
+        .addEmailTargets({ text });
+    }
+
+    function createQueue() {
+      const count = Number(document.getElementById('queueCount').value) || 0;
+      const topics = Array.from(document.querySelectorAll('.campaign-topic:checked')).map((el) => el.value);
+      if (count < 1) { setMsg('sendMsg', 'โควต้าวันนี้เต็มแล้ว', true); return; }
+      if (!topics.length) { setMsg('sendMsg', 'กรุณาเลือกอย่างน้อย 1 หัวข้อ', true); return; }
+      setMsg('sendMsg', 'กำลังสร้างคิว...', false);
+      google.script.run
+        .withSuccessHandler((res) => {
+          state.data.queue = res.queue;
+          state.data.dashboard = res.dashboard;
+          if (res.quota) state.data.quota = res.quota;
+          renderSendMail();
+          renderResults();
+          let msg, isErr = false;
+          if (res.blocked) { msg = res.message || 'โควต้าเต็มแล้ว'; isErr = true; }
+          else if (res.noTargets) { msg = 'ยังไม่มีรายชื่อเป้าหมาย — ไปเพิ่มที่หน้า Targets'; isErr = true; }
+          else {
+            msg = `สร้างคิวแล้ว ${res.queued} รายการ`;
+            if (res.clamped) msg += ` (ขอ ${res.requested} แต่โควต้าเหลือเท่านี้)`;
+          }
+          setMsg('sendMsg', msg, isErr);
+        })
+        .withFailureHandler((err) => setMsg('sendMsg', err.message || String(err), true))
+        .createRandomQueue({ count, topics });
+    }
+
+    function exportLogs() {
+      google.script.run
+        .withSuccessHandler((res) => {
+          const blob = new Blob([res.content], { type: 'text/plain;charset=utf-8' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = res.fileName;
+          a.click();
+          URL.revokeObjectURL(a.href);
+        })
+        .withFailureHandler(showError)
+        .exportLogsText();
+    }
+
+    // สำรองข้อมูลทั้งหมดเป็นไฟล์ Excel จริง (.xlsx) — server สร้างด้วย Utilities.zip แล้วส่ง base64 กลับมา
+    function exportData() {
+      const m = document.getElementById('backupMsg');
+      if (m) m.textContent = 'กำลังสร้างไฟล์ Excel…';
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (!res || !res.b64) { if (m) m.textContent = 'สร้างไฟล์ไม่สำเร็จ'; return; }
+          const bin = atob(res.b64);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = res.fileName || 'jojo_backup.xlsx';
+          a.click();
+          URL.revokeObjectURL(a.href);
+          if (m) m.textContent = 'ดาวน์โหลดแล้ว ✔ (' + res.sheets + ' ชีต)';
+        })
+        .withFailureHandler((err) => { if (m) m.textContent = (err && err.message) ? err.message : String(err); })
+        .exportDataXlsx();
+    }
+
+    // คลังคำถามฝังในหน้า (client) — ใช้เป็น fallback เมื่อ backend อ่านชีตไม่ได้/คืนค่าว่าง
+    // ทำให้หน้า training "กดได้เลย" โดยไม่พึ่ง server. correct = ลำดับตัวเลือก (เริ่มที่ 1)
+    const TRAINING_BANK = {
+      link: [
+        { question: 'ลิงก์ในอีเมลแสดงข้อความว่า "www.scb.co.th" แต่พอชี้เมาส์ค้างกลับขึ้น URL อื่น ควรทำอย่างไร?', choices: ['คลิกเพราะข้อความบอกว่าเป็นเว็บธนาคาร', 'ไม่คลิก เพราะ URL จริงไม่ตรงกับข้อความ'], correct: 2, explain: 'ข้อความที่แสดงปลอมได้เสมอ ให้ดู URL จริง (ชี้เมาส์ค้าง/กดค้างบนมือถือ) ถ้าโดเมนไม่ตรงอย่าคลิก' },
+        { question: 'โดเมนใด "น่าสงสัย" ว่าปลอมเลียนแบบ microsoft.com?', choices: ['login.microsoft.com', 'microsoft-secure-login.com'], correct: 2, explain: 'โดเมนจริงลงท้ายด้วย microsoft.com ส่วน microsoft-xxx.com เป็นคนละเว็บที่จดมาเลียนแบบ' },
+        { question: 'ลิงก์ย่อ (เช่น bit.ly/xxxx) ที่มากับข้อความเร่งด่วน ควร?', choices: ['กดดูเลยเพราะสั้นดูปลอดภัย', 'ระวัง เพราะลิงก์ย่อซ่อนปลายทางจริงไว้'], correct: 2, explain: 'ลิงก์ย่อปิดบังปลายทางจริง ให้ตรวจสอบก่อน หรือเข้าเว็บโดยพิมพ์ที่อยู่เอง' },
+        { question: 'วิธีที่ปลอดภัยที่สุดในการเข้าเว็บธนาคาร/ระบบงานคือ?', choices: ['คลิกลิงก์ในอีเมลที่ส่งมา', 'พิมพ์ที่อยู่เว็บเอง หรือใช้ bookmark ที่บันทึกไว้'], correct: 2, explain: 'พิมพ์เอง/ใช้ bookmark กันการถูกพาไปหน้าปลอม' }
+      ],
+      cred: [
+        { question: 'ระบบส่ง OTP มาที่มือถือคุณ แล้วมีคนโทรมาขอ OTP อ้างว่าเป็นเจ้าหน้าที่ ควร?', choices: ['บอกไปเพราะเป็นเจ้าหน้าที่', 'ไม่บอกเด็ดขาด เพราะไม่มีเจ้าหน้าที่จริงขอ OTP'], correct: 2, explain: 'OTP เป็นรหัสส่วนตัว ไม่มีองค์กรไหนขอผ่านโทรศัพท์/แชท ใครขอ = มิจฉาชีพ' },
+        { question: 'หน้าเว็บขอให้ "ยืนยันรหัสผ่าน" หลังกดลิงก์ในอีเมล ควร?', choices: ['กรอกรหัสผ่านตามที่ขอ', 'หยุด ตรวจ URL ก่อน ไม่กรอกถ้าน่าสงสัย'], correct: 2, explain: 'หน้า login ปลอมออกแบบมาขโมยรหัสผ่าน ให้เข้าเว็บเองและเปิด MFA' },
+        { question: 'การตั้งรหัสผ่านแบบใดปลอดภัยกว่า?', choices: ['ใช้รหัสเดียวกันทุกเว็บจะได้จำง่าย', 'ใช้รหัสต่างกันแต่ละเว็บ + เปิด MFA'], correct: 2, explain: 'ถ้ารหัสเดียวหลุด เว็บอื่นจะโดนตามหมด ใช้ password manager ช่วยได้' },
+        { question: 'MFA/2FA มีไว้เพื่ออะไร?', choices: ['ทำให้ login ช้าลงเฉย ๆ', 'เพิ่มชั้นป้องกัน แม้รหัสผ่านหลุดก็ยังเข้าบัญชีไม่ได้'], correct: 2, explain: 'MFA คือด่านที่สอง ช่วยกันบัญชีถูกยึดแม้รหัสผ่านรั่ว' }
+      ],
+      finance: [
+        { question: 'ได้อีเมลแจ้งว่า "เลขบัญชีคู่ค้าเปลี่ยน ให้โอนไปบัญชีใหม่ด่วน" ควร?', choices: ['โอนตามทันทีเพราะเร่งด่วน', 'โทรยืนยันกับคู่ค้าด้วยเบอร์ที่รู้จักก่อนโอน'], correct: 2, explain: 'การหลอกเปลี่ยนเลขบัญชี (BEC) พบบ่อยมาก ยืนยันทางโทรศัพท์ช่องทางเดิมเสมอ' },
+        { question: 'ใบแจ้งหนี้แนบมากับอีเมลแปลก ยอดสูงผิดปกติ และเร่งให้จ่าย ควร?', choices: ['จ่ายก่อนกันโดนปรับ', 'ตรวจสอบกับฝ่ายบัญชี/ผู้ขายตัวจริงก่อน'], correct: 2, explain: 'ความเร่งด่วน + ยอดผิดปกติคือสัญญาณกลโกง ตรวจสอบก่อนเสมอ' },
+        { question: 'อีเมลอ้างเป็น CEO สั่งให้ซื้อบัตรของขวัญด่วนแล้วส่งรหัสกลับไป ควร?', choices: ['ทำตามเพราะเป็นคำสั่งผู้บริหาร', 'สงสัยทันที เพราะเป็นรูปแบบหลอกที่พบบ่อย'], correct: 2, explain: 'การปลอมเป็นผู้บริหารขอบัตรของขวัญ/โอนเงินเป็นกลโกงคลาสสิก ยืนยันตัวตนก่อน' },
+        { question: 'เจอ SMS ว่า "พัสดุตกค้าง ชำระค่าธรรมเนียม 3 บาท" พร้อมลิงก์ ควร?', choices: ['จ่ายเพราะแค่ 3 บาทเอง', 'ไม่กดลิงก์ เพราะมักหลอกเอาข้อมูลบัตร'], correct: 2, explain: 'ยอดเล็กน้อยเป็นเหยื่อล่อให้กรอกข้อมูลบัตร ตรวจสอบกับขนส่งตัวจริง' }
+      ],
+      file: [
+        { question: 'ไฟล์แนบชื่อ "invoice.pdf.exe" ควร?', choices: ['เปิดดูเพราะเป็น PDF', 'ไม่เปิด เพราะจริง ๆ เป็นไฟล์ .exe (โปรแกรม)'], correct: 2, explain: 'นามสกุลซ้อนท้าย .exe/.scr/.js คือไฟล์รันโปรแกรม เสี่ยงมัลแวร์' },
+        { question: 'เอกสาร Word/Excel ขอให้ "Enable Macro / เปิดใช้มาโคร" ถึงจะดูเนื้อหาได้ ควร?', choices: ['กดเปิดมาโครเพื่อดูเนื้อหา', 'ไม่เปิด เพราะมาโครอาจเป็นมัลแวร์'], correct: 2, explain: 'มัลแวร์จำนวนมากซ่อนในมาโคร ปฏิเสธและตรวจสอบที่มาของไฟล์ก่อน' },
+        { question: 'ได้รับ USB หรือไฟล์จากคนที่ไม่รู้จัก ควร?', choices: ['เสียบ/เปิดดูว่ามีอะไร', 'ไม่เสียบ/ไม่เปิด และแจ้ง IT ถ้าน่าสงสัย'], correct: 2, explain: 'อุปกรณ์/ไฟล์แปลกปลอมอาจติดมัลแวร์ทันทีที่เปิด' },
+        { question: 'ดาวน์โหลดโปรแกรมควรเอาจากที่ใด?', choices: ['ลิงก์ในอีเมล/เว็บแจกฟรีทั่วไป', 'เว็บทางการของผู้ผลิต หรือผ่าน IT'], correct: 2, explain: 'แหล่งไม่เป็นทางการมักแถมมัลแวร์มาด้วย' }
+      ],
+      social: [
+        { question: 'มีคนอ้างเป็น "ฝ่าย IT" โทรมาขอให้ติดตั้งโปรแกรมรีโมตเพื่อ "แก้ปัญหา" ควร?', choices: ['ทำตามเพราะเป็น IT', 'ยืนยันตัวตนผ่านช่องทางองค์กรก่อนเสมอ'], correct: 2, explain: 'การปลอมเป็น IT/Helpdesk เพื่อเข้าควบคุมเครื่องพบบ่อย ตรวจสอบตัวตนก่อน' },
+        { question: 'ข้อความ "บัญชีจะถูกระงับใน 24 ชม." มีจุดประสงค์เพื่ออะไร?', choices: ['ช่วยเตือนเราจริง ๆ', 'กดดันให้รีบทำโดยไม่ทันคิด'], correct: 2, explain: 'การเร่งเร้าอารมณ์/ความกลัวคือเทคนิคหลักของ social engineering หยุดคิดก่อนเสมอ' },
+        { question: 'คนแปลกหน้าทักมาสนิทสนมเร็วผิดปกติ แล้วเริ่มขอข้อมูล/เงิน ควร?', choices: ['ไว้ใจเพราะคุยถูกคอ', 'ระวัง อาจเป็นการตีสนิทเพื่อหลอก'], correct: 2, explain: 'การสร้างความไว้ใจเร็ว ๆ แล้วขอข้อมูล/เงิน เป็นรูปแบบหลอกลวงทั่วไป' },
+        { question: 'เพื่อนร่วมงานส่งลิงก์แปลกผ่านแชทบริษัท ควร?', choices: ['กดเลยเพราะมาจากคนรู้จัก', 'ถามยืนยันก่อน เพราะบัญชีเขาอาจถูกแฮก'], correct: 2, explain: 'บัญชีที่ถูกยึดมักถูกใช้ส่งลิงก์อันตรายต่อ ตรวจสอบก่อนคลิก' }
+      ],
+      general: [
+        { question: 'เมื่อได้รับข้อความที่น่าสงสัยและเร่งด่วน ควรทำอย่างไร?', choices: ['ทำตามทันทีเพราะเร่งด่วน', 'หยุดและตรวจสอบผ่านช่องทางที่เชื่อถือได้'], correct: 2, explain: 'ความเร่งด่วนคือสัญญาณเตือนที่พบบ่อย ตรวจสอบผ่านช่องทางที่รู้จักก่อนเสมอ' },
+        { question: 'เมื่อสงสัยว่าอาจโดนฟิชชิ่ง ควรทำอะไรเป็นอันดับแรก?', choices: ['ลบทิ้งเงียบ ๆ', 'รายงาน IT/หัวหน้า เพื่อให้เตือนคนอื่นได้ทัน'], correct: 2, explain: 'การรายงานช่วยให้องค์กรป้องกันคนอื่นได้ทัน' }
+      ]
+    };
+
+    // คำแนะนำสั้นเฉพาะกลุ่ม — โชว์เป็นแบนเนอร์ด้านบนตามพารามิเตอร์ ?g=
+    const GROUP_TIP = {
+      link: 'โฟกัสเรื่อง "ลิงก์ & โดเมนปลอม" — ดู URL จริงก่อนคลิกเสมอ',
+      cred: 'โฟกัสเรื่อง "รหัสผ่าน & OTP/MFA" — ไม่บอกรหัส/OTP กับใครเด็ดขาด',
+      finance: 'โฟกัสเรื่อง "การเงิน & ใบแจ้งหนี้" — ยืนยันก่อนโอนทุกครั้ง',
+      file: 'โฟกัสเรื่อง "ไฟล์แนบ & อุปกรณ์" — ระวังไฟล์แปลกและมาโคร',
+      social: 'โฟกัสเรื่อง "Social Engineering" — อย่าให้ความเร่งด่วนพาไปคิดแทน'
+    };
+
+    // เลือกคำถามจากคลังในหน้า: ถ้ามี ?g= ใช้กลุ่มนั้น ไม่งั้นสุ่มคละทุกกลุ่ม — แล้วสุ่มลำดับ ตัดเหลือ 5 ข้อ
+    function localTrainingQuiz_(group) {
+      const g = String(group || '').toLowerCase();
+      let pool = (TRAINING_BANK[g] && TRAINING_BANK[g].length)
+        ? TRAINING_BANK[g].slice()
+        : Object.keys(TRAINING_BANK).reduce((acc, k) => acc.concat(TRAINING_BANK[k]), []);
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+      }
+      return pool.slice(0, Math.min(5, pool.length)).map((q) => Object.assign({ group: g || 'general' }, q));
+    }
+
+    function renderTrainingStandalone() {
+      document.getElementById('app').classList.add('hidden');
+      const root = document.getElementById('trainingApp');
+      root.classList.remove('hidden');
+      root.innerHTML = `
+        <div class="section">
+          <div class="section-title">JOJO+ Awareness Training</div>
+          <div class="section-body"><p class="muted">กำลังโหลด...</p></div>
+        </div>
+      `;
+      // บันทึกว่าคลิกลิงก์เข้ามา
+      google.script.run.recordTrainingAction({
+        customer_id: params.get('c') || '',
+        email: params.get('e') || '',
+        topic: params.get('t') || 'Training Page',
+        action: 'clicked',
+        score: ''
+      });
+      // ดึงคำถามแบบสุ่ม 3 ข้อจากกลุ่ม (?g=) + คลังของหน่วยงาน (?c=)
+      google.script.run
+        .withSuccessHandler(renderTrainingQuiz)
+        .withFailureHandler(() => renderTrainingQuiz(null))
+        .getTrainingQuiz(params.get('g') || params.get('t') || '', params.get('c') || '');
+    }
+
+    function renderTrainingQuiz(list) {
+      // ใช้คำถามจาก server ถ้ามี — ไม่งั้นดึงจากคลังในหน้า (กดทำได้เลยแม้ backend อ่านชีตไม่ได้)
+      const group = params.get('g') || params.get('t') || '';
+      let quiz = (Array.isArray(list) && list.length) ? list : localTrainingQuiz_(group);
+      if (!quiz.length) quiz = localTrainingQuiz_('');
+      state.quiz = quiz;
+      state.answers = {};
+      const tip = GROUP_TIP[String(group).toLowerCase()];
+      const tipHtml = tip ? `<div class="message">🎯 ${escapeHtml(tip)}</div>` : '';
+      const items = quiz.map((q, qi) => {
+        const choices = (q.choices && q.choices.length) ? q.choices : ['หยุดและตรวจสอบก่อน'];
+        return `
+        <div class="quiz-item">
+          <p><b>ข้อ ${qi + 1}.</b> ${escapeHtml(q.question || '')}</p>
+          <div class="quiz" id="quiz_${qi}">
+            ${choices.map((c, i) => `<button type="button" id="q${qi}_c${i + 1}" onclick="pickAnswer(${qi}, ${i + 1})">${escapeHtml(c)}</button>`).join('')}
+          </div>
+          <div class="qfb" id="fb_${qi}"></div>
+        </div>`;
+      }).join('');
+      document.getElementById('trainingApp').innerHTML = `
+        <div class="section">
+          <div class="section-title">JOJO+ Awareness Training</div>
+          <div class="section-body">
+            <h1>หยุด • ตรวจสอบ • รายงาน</h1>
+            <p>หน้านี้สำหรับการอบรมความตระหนักรู้ภายในเท่านั้น — ไม่มีการขอรหัสผ่านหรือเก็บข้อมูลใด ๆ</p>
+            ${tipHtml}
+
+            <h3>📧 ตัวอย่างเมลหลอก — ลองดูแบบที่เห็นใน Outlook</h3>
+            <p>นี่คืออีเมลแบบที่มิจฉาชีพมักส่งมา ลองกดปุ่มในเมลดูสิว่าเกิดอะไรขึ้น 👇</p>
+            <div class="ol">
+              <div class="ol-bar"><span class="ol-btn">↩ ตอบกลับ</span><span class="ol-btn">↪ ส่งต่อ</span><span class="ol-btn">🗑 ลบ</span><span style="margin-left:auto;opacity:.85;">มุมมองจำลอง (Outlook)</span></div>
+              <div class="ol-subject">[ด่วนที่สุด] บัญชีของคุณจะถูกระงับภายใน 24 ชั่วโมง</div>
+              <div class="ol-meta">
+                <div class="ol-ava">ฝ</div>
+                <div>
+                  <div class="ol-from"><b>ฝ่ายความปลอดภัยบัญชี</b> &lt;security-alert@scb-secure-login.com&gt;</div>
+                  <div class="ol-to">ถึง: คุณ</div>
+                </div>
+              </div>
+              <div class="ol-warn">⚠ นี่คือ <b>การจำลอง</b>เพื่อฝึกเท่านั้น — ปุ่มในเมลไม่ได้พาไปไหนจริง</div>
+              <div class="ol-body">
+                <p>เรียนผู้ใช้งาน</p>
+                <p>ระบบตรวจพบกิจกรรมผิดปกติในบัญชีของคุณ กรุณายืนยันตัวตนภายใน <b>24 ชั่วโมง</b> มิฉะนั้นบัญชีจะถูกระงับถาวร</p>
+                <p style="text-align:center; margin:18px 0;">
+                  <a href="javascript:void(0)" onclick="revealPhishFlags()" style="display:inline-block; background:#2f8f5b; color:#fff; padding:12px 26px; border-radius:6px; text-decoration:none; font-weight:700;">ยืนยันบัญชีทันที</a>
+                </p>
+                <p style="font-size:12px; color:#999;">หากไม่ดำเนินการ บัญชีจะถูกล็อกโดยอัตโนมัติ</p>
+              </div>
+            </div>
+            <div id="phishFlags"></div>
+
+            <h3>ฟิชชิ่ง (Phishing) คืออะไร?</h3>
+            <p>การหลอกลวงผ่านอีเมล ข้อความ หรือโทรศัพท์ เพื่อให้เรากดลิงก์ปลอม กรอกรหัส โอนเงิน หรือเปิดไฟล์อันตราย โดยปลอมเป็นคน/องค์กรที่เราไว้ใจ</p>
+
+            <h3>5 รูปแบบที่พบบ่อย</h3>
+            <ul>
+              <li><b>ลิงก์ &amp; โดเมนปลอม</b> — ลิงก์ที่ดูเหมือนจริงแต่พาไปเว็บปลอม</li>
+              <li><b>รหัสผ่าน &amp; OTP/MFA</b> — หลอกขอรหัสผ่านหรือรหัส OTP</li>
+              <li><b>การเงิน &amp; ใบแจ้งหนี้</b> — หลอกเปลี่ยนเลขบัญชี/เร่งให้โอน</li>
+              <li><b>ไฟล์แนบ &amp; อุปกรณ์</b> — ไฟล์หรือ USB ที่ซ่อนมัลแวร์</li>
+              <li><b>Social Engineering</b> — ตีสนิท อ้างตัวตน หรือสร้างความเร่งด่วน</li>
+            </ul>
+
+            <h3>🚩 สัญญาณอันตราย</h3>
+            <ul>
+              <li>เร่งรัด กดดัน หรือขู่ว่าจะเสียประโยชน์</li>
+              <li>ลิงก์ที่โดเมนไม่ตรง หรือเป็นลิงก์ย่อ</li>
+              <li>ขอรหัสผ่าน OTP/MFA ข้อมูลส่วนตัว หรือการชำระเงิน</li>
+              <li>ไฟล์แนบแปลก ขอให้เปิดมาโคร หรือนามสกุลซ้อนท้าย .exe</li>
+              <li>ชื่อผู้ส่ง/ที่อยู่อีเมลสะกดผิดเล็กน้อย</li>
+            </ul>
+
+            <h3>✅ เมื่อสงสัย จำง่าย ๆ ว่า "หยุด–ตรวจ–แจ้ง"</h3>
+            <ul>
+              <li><b>หยุด</b> — อย่าเพิ่งคลิก กรอก หรือโอน</li>
+              <li><b>ตรวจสอบ</b> — ดูโดเมนจริง ใช้เบอร์/ช่องทางที่รู้จัก พิมพ์เว็บเอง</li>
+              <li><b>รายงาน</b> — แจ้ง IT หรือหัวหน้าทันทีถ้าน่าสงสัย</li>
+            </ul>
+
+            <h3>📝 ทดสอบความเข้าใจ — ${quiz.length} ข้อ (ผ่านเมื่อตอบถูกทั้งหมด)</h3>
+            ${items}
+            <div class="actions"><button class="btn" id="quizSubmit" onclick="submitQuiz()">ส่งคำตอบ</button></div>
+            <div id="quizResult"></div>
+          </div>
+        </div>
+      `;
+    }
+
+    // กดปุ่มในเมลจำลอง → ไม่พาไปไหน แต่เฉลย "จุดสังเกต" เป็นการสอนในตัว
+    function revealPhishFlags() {
+      const box = document.getElementById('phishFlags');
+      if (!box) return;
+      box.innerHTML = `
+        <div class="message">
+          🛑 <b>หยุด!</b> ในของจริง ปุ่มแบบนี้จะพาไป<b>หน้าปลอม</b>เพื่อขโมยรหัสผ่าน/ข้อมูล — นี่เป็นเพียง<b>การจำลองเพื่อฝึก</b>
+          <p style="margin:10px 0 4px;"><b>จุดที่ควรเอะใจ:</b></p>
+          <ul style="margin:0;">
+            <li>📛 โดเมนผู้ส่ง <b>scb-secure-login.com</b> ไม่ใช่ของจริง (ธนาคารจริงคือ scb.co.th)</li>
+            <li>⏰ สร้างความเร่งด่วน/ขู่ว่า "บัญชีจะถูกระงับใน 24 ชม."</li>
+            <li>🔗 มีปุ่มชวนให้ "ยืนยันบัญชี" ผ่านลิงก์ในอีเมล</li>
+            <li>🙅 ของจริงธนาคาร/องค์กรจะไม่ขอให้ยืนยันรหัสผ่านทางลิงก์</li>
+          </ul>
+          <p style="margin:10px 0 0;">✅ ที่ถูกคือ: <b>หยุด → ตรวจสอบ (พิมพ์เว็บเอง/โทรหาธนาคาร) → รายงาน IT</b></p>
+        </div>`;
+      box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function pickAnswer(qi, choice) {
+      state.answers[qi] = choice;
+      const box = document.getElementById('quiz_' + qi);
+      if (box) Array.from(box.querySelectorAll('button')).forEach((b) => b.classList.remove('sel'));
+      const btn = document.getElementById('q' + qi + '_c' + choice);
+      if (btn) btn.classList.add('sel');
+    }
+
+    function submitQuiz() {
+      const quiz = state.quiz || [];
+      if (Object.keys(state.answers).length < quiz.length) {
+        setMsg('quizResult', 'กรุณาตอบให้ครบทุกข้อ', true);
+        return;
+      }
+      let correctCount = 0;
+      quiz.forEach((q, qi) => {
+        const ans = Number(state.answers[qi]);
+        const ok = Number(q.correct) === ans;
+        if (ok) correctCount++;
+        const fb = document.getElementById('fb_' + qi);
+        if (fb) {
+          fb.className = 'qfb ' + (ok ? 'ok' : 'no');
+          fb.textContent = (ok ? '✔ ถูกต้อง — ' : '✘ ลองทบทวน — ') + (q.explain || '');
+        }
+        const chosen = document.getElementById('q' + qi + '_c' + ans);
+        if (chosen) chosen.classList.add(ok ? 'ok' : 'no');
+        if (!ok) {
+          const right = document.getElementById('q' + qi + '_c' + Number(q.correct));
+          if (right) right.classList.add('ok');
+        }
+      });
+      const passed = correctCount === quiz.length;
+      document.getElementById('quizResult').innerHTML = passed
+        ? `<div class="message">ผ่าน! ตอบถูกครบ ${correctCount}/${quiz.length} ข้อ — เยี่ยมมาก หากเจอของจริงให้รายงาน IT เสมอ</div>`
+        : `<div class="message error">ตอบถูก ${correctCount}/${quiz.length} ข้อ — ทบทวนคำอธิบายด้านบน แล้วระวังให้มากขึ้นครั้งหน้า</div>`;
+      const btn = document.getElementById('quizSubmit');
+      if (btn) btn.disabled = true;
+      google.script.run.recordTrainingAction({
+        customer_id: params.get('c') || '',
+        email: params.get('e') || '',
+        topic: params.get('g') || params.get('t') || (quiz[0] && quiz[0].group) || 'Training Page',
+        action: passed ? 'passed' : 'trained',
+        score: correctCount
+      });
+    }
+
+    // ตัวช่วยเรียก server: โชว์ "กำลังทำงาน..." ทันที + จัดการ error ให้เห็นชัด
+    function callServer(method, arg, onSuccess, msgId) {
+      if (msgId) setMsg(msgId, 'กำลังทำงาน...', false);
+      const runner = google.script.run
+        .withSuccessHandler((res) => {
+          if (!res) { if (msgId) setMsg(msgId, 'เซิร์ฟเวอร์คืนค่าว่าง ลองใหม่อีกครั้ง', true); return; }
+          onSuccess(res);
+        })
+        .withFailureHandler((err) => {
+          const m = (err && err.message) ? err.message : String(err);
+          if (msgId) setMsg(msgId, m, true); else showFatal(m);
+        });
+      runner[method](arg);
+    }
+
+    function val(id) {
+      const el = document.getElementById(id);
+      return el ? String(el.value).trim() : '';
+    }
+
+    // URL จริงของเว็บแอป (/exec) จาก server — ใช้สร้างลิงก์ training/จำลองที่เปิดได้จริง
+    // (อย่าใช้ location.href เพราะ client รันใน iframe sandbox ของ Apps Script)
+    function appBase() {
+      return (state.data && state.data.appUrl) ? state.data.appUrl : (location.origin + location.pathname);
+    }
+
+    /* ===== Excel (.xlsx) ฝั่งเบราว์เซอร์ด้วย SheetJS ===== */
+    function fileOf(id) {
+      const input = document.getElementById(id);
+      return input && input.files && input.files[0] ? input.files[0] : null;
+    }
+    function lcKeys(row) {
+      const o = {};
+      Object.keys(row).forEach((k) => { o[String(k).toLowerCase().trim()] = row[k]; });
+      return o;
+    }
+    // อ่านไฟล์ Excel/CSV → คืน array ของ object (คีย์ = หัวคอลัมน์) ผ่าน callback
+    function readSheet(file, onRows, msgId) {
+      if (typeof XLSX === 'undefined') { setMsg(msgId, 'ไลบรารี Excel ยังโหลดไม่เสร็จ รอสักครู่แล้วลองใหม่', true); return; }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          onRows(XLSX.utils.sheet_to_json(ws, { defval: '', raw: false }));
+        } catch (err) {
+          setMsg(msgId, 'อ่านไฟล์ Excel ไม่สำเร็จ: ' + (err && err.message ? err.message : err), true);
+        }
+      };
+      reader.onerror = () => setMsg(msgId, 'อ่านไฟล์ไม่สำเร็จ', true);
+      reader.readAsArrayBuffer(file);
+    }
+    // สร้างไฟล์เทมเพลต .xlsx (รองรับไทย) ให้ผู้ใช้กรอกแล้วอัปโหลดกลับ ลดความผิดพลาด
+    function downloadXlsxTemplate(filename, headers, example) {
+      if (typeof XLSX === 'undefined') { alert('ไลบรารี Excel ยังโหลดไม่เสร็จ ลองใหม่อีกครั้ง'); return; }
+      const ws = XLSX.utils.json_to_sheet([example], { header: headers });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Template');
+      XLSX.writeFile(wb, filename);
+    }
+    function downloadEmailTemplate() {
+      downloadXlsxTemplate('jojo_email_template.xlsx',
+        ['email', 'fullname', 'department'],
+        { email: 'somchai@example.com', fullname: 'สมชาย ใจดี', department: 'ฝ่ายบัญชี' });
+    }
+    function downloadQuestionTemplate() {
+      downloadXlsxTemplate('jojo_question_template.xlsx',
+        ['group', 'question', 'choices', 'correct', 'explain'],
+        { group: 'link', question: 'ได้รับลิงก์แปลกในอีเมล ควรทำอย่างไร?', choices: 'กดทันที|ตรวจสอบโดเมนก่อน', correct: 2, explain: 'ตรวจสอบโดเมน/ผู้ส่งก่อนเสมอ' });
+    }
+
+    /* Email List */
+    function addEmail() {
+      const email = val('newEmail');
+      if (!email) { setMsg('emailMsg', 'กรอกอีเมลก่อน', true); return; }
+      callServer('addEmailRow', { email: email, fullname: val('newName'), department: val('newDept') }, (res) => {
+        state.data.emailList = res.emailList; state.data.dashboard = res.dashboard;
+        renderEmailList(); renderResults();
+      }, 'emailMsg');
+    }
+    function saveEmail(r) {
+      callServer('updateEmailRow', { row_index: r, email: val('em_email_' + r), fullname: val('em_name_' + r), department: val('em_dept_' + r) }, (res) => {
+        state.data.emailList = res.emailList; state.data.dashboard = res.dashboard;
+        renderEmailList(); renderResults();
+      }, 'emailMsg');
+    }
+    function removeEmail(r) {
+      if (!confirm('ลบรายชื่อนี้?')) return;
+      callServer('deleteEmailRow', r, (res) => {
+        state.data.emailList = res.emailList; state.data.dashboard = res.dashboard;
+        renderEmailList(); renderResults();
+      }, 'emailMsg');
+    }
+    function moveEmail(r, dir) {
+      callServer('moveEmailRow', { row_index: r, direction: dir }, (res) => {
+        state.data.emailList = res.emailList; renderEmailList();
+      }, 'emailMsg');
+    }
+    function applyEmailImport(res) {
+      state.data.emailList = res.emailList; state.data.dashboard = res.dashboard;
+      renderEmailList(); renderResults();
+      setMsg('emailUpMsg', `นำเข้า ${res.added} รายชื่อ` + (res.errors && res.errors.length ? ` · ข้าม ${res.errors.length}: ${res.errors.slice(0, 3).join(' ; ')}` : ''), !!(res.errors && res.errors.length));
+    }
+    function importEmailsFromSheet() {
+      const url = val('emailSheetUrl');
+      if (!url) { setMsg('emailUpMsg', 'วางลิงก์ Google Sheet ก่อน', true); return; }
+      callServer('importEmailsFromSheet', url, applyEmailImport, 'emailUpMsg');
+    }
+    function uploadEmailsXlsx() {
+      const file = fileOf('emailXlsxFile');
+      if (!file) { setMsg('emailUpMsg', 'เลือกไฟล์ Excel ก่อน', true); return; }
+      setMsg('emailUpMsg', 'กำลังอ่านไฟล์ Excel...', false);
+      readSheet(file, (raw) => {
+        const rows = raw.map(lcKeys)
+          .map((r) => ({
+            email: String(r.email || '').trim(),
+            fullname: String(r.fullname || r.name || r['ชื่อ'] || '').trim(),
+            department: String(r.department || r.dept || r['แผนก'] || '').trim()
+          }))
+          .filter((r) => r.email);
+        if (!rows.length) { setMsg('emailUpMsg', 'ไม่พบข้อมูล (ต้องมีคอลัมน์ชื่อ email ในแถวแรก)', true); return; }
+        callServer('importEmails', { rows }, applyEmailImport, 'emailUpMsg');
+      }, 'emailUpMsg');
+    }
+
+    /* Topics */
+    function addTopic() {
+      const topic = val('newTopic');
+      if (!topic) { setMsg('topicMsg', 'กรอกชื่อหัวข้อก่อน', true); return; }
+      callServer('addTopicRow', { topic: topic, category: val('newCat') }, (res) => {
+        state.data.topics = res.topics; renderTopics();
+      }, 'topicMsg');
+    }
+    function saveTopic(r) {
+      callServer('updateTopicRow', {
+        row_index: r, topic: val('tp_topic_' + r), category: val('tp_cat_' + r),
+        question: val('tp_q_' + r), choices: val('tp_ch_' + r), correct: val('tp_cor_' + r)
+      }, (res) => { state.data.topics = res.topics; renderTopics(); }, 'topicMsg');
+    }
+    function removeTopic(r) {
+      if (!confirm('ลบหัวข้อนี้?')) return;
+      callServer('deleteTopicRow', r, (res) => { state.data.topics = res.topics; renderTopics(); }, 'topicMsg');
+    }
+    function moveTopic(r, dir) {
+      callServer('moveTopicRow', { row_index: r, direction: dir }, (res) => { state.data.topics = res.topics; renderTopics(); }, 'topicMsg');
+    }
+    function toggleTopic(r, on) {
+      callServer('updateTopicRow', { row_index: r, active: on }, (res) => { state.data.topics = res.topics; renderTopics(); }, 'topicMsg');
+    }
+
+    /* Questions bank */
+    function applyQuestions(res) {
+      state.data.questions = res.questions;
+      state.data.questionGroups = res.questionGroups;
+      renderTrainingPanel();
+    }
+    function addQuestion() {
+      const question = val('nqQuestion');
+      if (!question) { setMsg('qMsg', 'พิมพ์คำถามก่อน', true); return; }
+      const rows = Array.from(document.querySelectorAll('#choiceBox .choice-row'));
+      const choices = []; let correct = 0; let idx = 0;
+      rows.forEach((row) => {
+        const v = String(row.querySelector('.qchoice').value).trim();
+        if (!v) return;
+        idx++;
+        choices.push(v);
+        if (row.querySelector('input[name="qcorrect"]').checked) correct = idx;
+      });
+      if (choices.length < 2) { setMsg('qMsg', 'ใส่ตัวเลือกอย่างน้อย 2 ข้อ', true); return; }
+      if (!correct) { setMsg('qMsg', 'คลิกวงกลมหน้าข้อที่ถูกก่อน', true); return; }
+      const data = { group: state.qForm.group, question, choices: choices.join('|'), correct, explain: val('nqExplain') };
+      callServer('addQuestionRow', data, (res) => { state.qForm.choices = 2; applyQuestions(res); }, 'qMsg');
+    }
+    function openLink(btn) {
+      const u = btn.getAttribute('data-link');
+      if (u) window.open(u, '_blank');
+    }
+    function copyLink(btn) {
+      const u = btn.getAttribute('data-link');
+      if (!u) return;
+      if (navigator.clipboard) { try { navigator.clipboard.writeText(u); } catch (e) {} }
+      const old = btn.textContent; btn.textContent = 'คัดลอกแล้ว ✔';
+      setTimeout(() => { btn.textContent = old; }, 1200);
+    }
+    function copyInput(btn) {
+      const inp = btn.parentElement.querySelector('input');
+      if (!inp) return;
+      inp.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      if (navigator.clipboard) { try { navigator.clipboard.writeText(inp.value); } catch (e) {} }
+      const old = btn.textContent; btn.textContent = 'คัดลอกแล้ว ✔';
+      setTimeout(() => { btn.textContent = old; }, 1200);
+    }
+    function removeQuestion(r) {
+      if (!confirm('ลบคำถามนี้?')) return;
+      callServer('deleteQuestionRow', r, applyQuestions, 'qMsg');
+    }
+    function toggleQuestionActive(r, on) {
+      callServer('toggleQuestion', { row_index: r, active: on }, applyQuestions, 'qMsg');
+    }
+    function importFromSheet() {
+      const url = val('sheetUrl');
+      if (!url) { setMsg('upMsg', 'วางลิงก์ Google Sheet ก่อน', true); return; }
+      callServer('importQuestionsFromSheet', url, (res) => {
+        applyQuestions(res);
+        setMsg('upMsg', `นำเข้า ${res.added} ข้อ` + (res.errors.length ? ` · ข้าม ${res.errors.length}: ${res.errors.slice(0, 3).join(' ; ')}` : ''), res.errors.length > 0);
+      }, 'upMsg');
+    }
+    function uploadQuestionsXlsx() {
+      const file = fileOf('qXlsxFile');
+      if (!file) { setMsg('upMsg', 'เลือกไฟล์ Excel ก่อน', true); return; }
+      setMsg('upMsg', 'กำลังอ่านไฟล์ Excel...', false);
+      readSheet(file, (raw) => {
+        const rows = raw.map(lcKeys)
+          .filter((r) => String(r.question || '').trim())
+          .map((r) => ({
+            group: String(r.group || '').trim(),
+            question: String(r.question || '').trim(),
+            choices: String(r.choices || '').trim(),
+            correct: r.correct,
+            explain: String(r.explain || '').trim()
+          }));
+        if (!rows.length) { setMsg('upMsg', 'ไม่พบข้อมูล (ต้องมีคอลัมน์ group, question, choices, correct)', true); return; }
+        callServer('importQuestions', { rows }, (res) => {
+          applyQuestions(res);
+          setMsg('upMsg', `นำเข้า ${res.added} ข้อ` + (res.errors.length ? ` · ข้าม ${res.errors.length}: ${res.errors.slice(0, 3).join(' ; ')}` : ''), res.errors.length > 0);
+        }, 'upMsg');
+      }, 'upMsg');
+    }
+
+    function setMsg(id, text, isError) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.innerHTML = `<div class="message ${isError ? 'error' : ''}">${escapeHtml(text)}</div>`;
+    }
+
+    function showError(err) {
+      showFatal(err && err.message ? err.message : String(err));
+    }
+
+    function showFatal(message) {
+      const box = document.getElementById('userbox');
+      if (box) box.textContent = 'Error';
+      const recent = document.getElementById('recentLogs');
+      if (recent) recent.textContent = '-';
+      const app = document.getElementById('app');
+      if (app) app.classList.remove('hidden');
+      let banner = document.getElementById('fatalBanner');
+      if (!banner && app) {
+        banner = document.createElement('div');
+        banner.id = 'fatalBanner';
+        banner.className = 'message error';
+        banner.style.margin = '12px 18px';
+        app.insertBefore(banner, app.firstChild);
+      }
+      if (banner) banner.textContent = message;
+    }
+
+    function formatCell(value) {
+      if (value === true) return 'true';
+      if (value === false) return 'false';
+      return formatDate(value);
+    }
+
+    // แสดงเวลาเป็นเวลาไทย (Asia/Bangkok) — server ส่ง Date มาเป็น ISO (UTC, ลงท้าย Z)
+    function thaiTime(d) {
+      try {
+        return d.toLocaleString('sv-SE', { timeZone: 'Asia/Bangkok' }); // รูปแบบ YYYY-MM-DD HH:mm:ss (ปี ค.ศ.)
+      } catch (e) {
+        return d.toISOString();
+      }
+    }
+    function formatDate(value) {
+      if (!value) return '';
+      if (Object.prototype.toString.call(value) === '[object Date]') return thaiTime(value);
+      const s = String(value);
+      // แปลงเฉพาะ timestamp รูป ISO (มีเวลา) ส่วนวันที่ล้วน (yyyy-MM-dd) ปล่อยไว้เหมือนเดิม
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) {
+        const d = new Date(s);
+        if (!isNaN(d.getTime())) return thaiTime(d);
+      }
+      return s;
+    }
+
+    function escapeHtml(value) {
+      return String(value === undefined || value === null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value);
+    }
+  </script>
+</body>
+</html>

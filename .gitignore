@@ -1,0 +1,17 @@
+# Old backups (kept local only)
+backup/
+
+# Claude Code local files
+.claude/settings.local.json
+.claude/projects/
+.claude/memory/
+
+# Local notes / memory
+project_memory.txt
+
+# OS / editor
+Thumbs.db
+.DS_Store
+*.swp
+.vscode/
+.idea/
