@@ -1,7 +1,32 @@
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║  CONFIG — แก้เฉพาะบล็อกนี้เมื่อก๊อปไปติดตั้งบนชีต/สคริปต์ของตัวเอง (ดู INSTALL.md)   ║
+// ║  โมเดล: single-tenant / self-deploy — 1 องค์กร = 1 ชุด (ชีต+สคริปต์+deployment)  ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
+const CONFIG = {
+  // ผู้พัฒนา (ผู้เขียนซอฟต์แวร์) — แสดงเครดิต "พัฒนาโดย" เสมอ + เป็น admin เสมอ ไม่ว่าติดตั้งบนบัญชีใด
+  developerEmail: 'sunart.srisumal@gmail.com',
+  // admin เพิ่มเติม — เจ้าของชีต (บัญชีที่ติดตั้ง) เป็น admin อัตโนมัติอยู่แล้ว ปล่อย [] ได้
+  adminEmails: [],
+
+  // ID ชีตฐานข้อมูล — ใช้เป็น fallback เมื่อ getActiveSpreadsheet() คืน null
+  // ติดตั้งใหม่: ใส่ ID ชีตของตัวเอง
+  spreadsheetId: '1tEp9CSHtWZhaSSfh5lDf5mkfT1L5WI7YFiYfsdN-mtM',
+
+  // URL /exec ของ deployment แอด admin — ปล่อย '' ได้ ระบบ auto-detect จาก ScriptApp.getService().getUrl()
+  webAppUrl: 'https://script.google.com/macros/s/AKfycbzdPMQHI0NEGys7MhMFbJWEZbWc41M99wllvzDT76Q8rv-enPYVCd9KL7jhV5fRLkPD/exec',
+
+  // URL /exec ของ deployment training แบบ "ทุกคน/ไม่ต้องล็อกอิน" (Execute as Me + Anyone)
+  // ปล่อย '' = ใช้ webAppUrl แทน (แต่จะกลายเป็นต้องล็อกอิน) — ดู [[anonymous-training-deployment]]
+  trainingWebAppUrl: 'https://script.google.com/macros/s/AKfycbzr9C0vwwFfJ7sJI0SSzfwND1U9tTLrkw6TuTUyM6hoc_rgCRkawKykD5As52jglZw/exec',
+
+  // seed ข้อมูลสาธิต (ลูกค้า SUNART/TFP + อีเมล/ผลตัวอย่าง) — ติดตั้งใช้งานจริงให้ตั้ง false เพื่อ DB สะอาด
+  seedDemo: true
+};
+
 const APP = {
   name: 'JOJO+ Phishing Simulation',
   version: '1',
-  developer: 'sunart.srisumal@gmail.com',
+  developer: CONFIG.developerEmail,
   logFileName: 'jojo_phishing_log.txt',
   defaults: {
     maxDomains: 3,
@@ -10,12 +35,11 @@ const APP = {
   }
 };
 
-// ID ของชีต JOJO+ Phishing Simulation — ใช้เป็น fallback กรณี getActiveSpreadsheet() คืน null
-// (เก็บแยกจาก APP เพื่อไม่ให้ ID ถูกส่งไปฝั่ง client ผ่าน getBootstrap)
-const SPREADSHEET_ID = '1tEp9CSHtWZhaSSfh5lDf5mkfT1L5WI7YFiYfsdN-mtM';
+// ID ชีต (มาจาก CONFIG) — เก็บแยกไม่ให้ถูกส่งไปฝั่ง client ผ่าน getBootstrap
+const SPREADSHEET_ID = CONFIG.spreadsheetId;
 
 // เพิ่มเลขนี้ทุกครั้งที่แก้ HEADERS/seed เพื่อบังคับ setupDatabase รันใหม่ 1 ครั้งหลัง deploy
-const SCHEMA_VERSION = 10;
+const SCHEMA_VERSION = 13;
 
 // กลุ่มคำถามอบรม (5 กลุ่ม) — code ใช้ในชีต Questions, label แสดงผลภาษาไทย
 const QUESTION_GROUPS = [
@@ -32,8 +56,8 @@ const QUOTA_DEFAULTS = {
   customerDailyCap: 30   // เพดานต่อ 1 ลูกค้า/วัน (กันลูกค้าเดียวกินโควต้าหมด)
 };
 
-// อีเมลที่เป็น admin เสมอ (นอกเหนือจากที่อยู่ในชีต Customers และเจ้าของชีต)
-const ADMIN_EMAILS = ['sunart.srisumal@gmail.com', 'dev.mis.tfp@gmail.com'];
+// อีเมลที่เป็น admin เสมอ (มาจาก CONFIG — นอกเหนือจากที่อยู่ในชีต Customers และเจ้าของชีต)
+const ADMIN_EMAILS = CONFIG.adminEmails;
 
 const SHEETS = {
   customers: 'Customers',
@@ -91,14 +115,19 @@ function setupDatabase() {
     const sheet = getOrCreateSheet_(ss, name);
     ensureHeaders_(sheet, HEADERS[name]);
   });
+  // จำเป็นเสมอ: ตั้งค่า, admin, เนื้อหาอบรม (หัวข้อ + คลังคำถาม)
   seedSettings_();
   seedAdmin_();
-  seedInitialCustomers_();
   seedTopics_();
   seedExtraTopics_();
   seedQuestions_();
   seedScamQuestions_();
-  seedDemoSimulation_();
+  // ข้อมูลสาธิตเท่านั้น (ลูกค้าตัวอย่าง + อีเมล/ผล) — ปิดได้ด้วย CONFIG.seedDemo=false สำหรับติดตั้งจริง
+  if (CONFIG.seedDemo) {
+    seedInitialCustomers_();
+    seedDemoSimulation_();
+    seedIsolationDemo_();
+  }
   cache.put(cacheKey, '1', 21600); // 6 ชั่วโมง
   return { ok: true, message: 'Database ready' };
 }
@@ -112,6 +141,7 @@ function getBootstrap() {
     return jsonSafe_({
       app: APP,
       appUrl: getAppUrl_(),
+      trainingUrl: getTrainingUrl_(),
       user: user,
       dashboard: getDashboardData(),
       topics: rows_(SHEETS.mailTopics),
@@ -611,7 +641,8 @@ function computeQuota_(user) {
     customer_today: customerToday,
     platform_remaining: platformRemaining,
     customer_remaining: customerRemaining,
-    available: Math.min(customerRemaining, platformRemaining)
+    // single-tenant: เหลือลิมิตเดียว = เพดานต่อวันของ Gmail (platform_daily_cap, ดีฟอลต์ 100) ไม่บังคับ customer cap
+    available: platformRemaining
   };
 }
 
@@ -698,7 +729,8 @@ function dateStr_(d) { return Utilities.formatDate(new Date(d), Session.getScrip
 // สร้างเนื้อหาเมลจำลอง (ใช้ร่วมทั้ง preview และ send จริง) — ผู้ส่งที่แสดงเป็นชื่อ "ลวง"
 // เพื่อความสมจริงในหน้าจำลองเท่านั้น (ตอนส่งจริงผู้ส่งคือบัญชีระบบ ไม่ปลอม)
 function buildTestMail_(user) {
-  const link = getAppUrl_() + '?page=training&g=link&c=' + encodeURIComponent(user.customer_id || '');
+  // ใช้ cid= (ไม่ใช่ c=) เพราะ c เป็นพารามิเตอร์สงวนของ Google → /exec ตอบ 400 ก่อนถึงสคริปต์
+  const link = getTrainingUrl_() + '?page=training&g=link&cid=' + encodeURIComponent(user.customer_id || '');
   return {
     to: user.email,
     fromName: 'IT Support',
@@ -740,11 +772,14 @@ function sendTestMail() {
   setupDatabase();
   const user = getCurrentUser_();
   requireCustomer_(user);
+  // ความปลอดภัย: ส่งจริงได้เฉพาะ "อีเมลของบัญชีที่ล็อกอินอยู่จริง" เท่านั้น
+  // ใช้ Session โดยตรง (ไม่ใช่ user.email) เพื่อให้แม้อยู่ในโหมดจำลองลูกค้า ก็ส่งเข้ากล่องตัวเองเสมอ ไม่ส่งหาผู้อื่น
+  const realEmail = (Session.getActiveUser().getEmail() || '').toLowerCase();
+  if (!realEmail) throw new Error('ไม่พบอีเมลของผู้ใช้ปัจจุบัน');
   const m = buildTestMail_(user);
-  if (!m.to) throw new Error('ไม่พบอีเมลของผู้ใช้ปัจจุบัน');
-  MailApp.sendEmail({ to: m.to, subject: '[ทดสอบจำลอง] ' + m.subject, htmlBody: m.html, name: 'JOJO+ Awareness (ทดสอบ)' });
-  logAction_('SEND_TEST_MAIL', 'OK', m.to);
-  return jsonSafe_({ ok: true, to: m.to });
+  MailApp.sendEmail({ to: realEmail, subject: '[ทดสอบจำลอง] ' + m.subject, htmlBody: m.html, name: 'JOJO+ Awareness (ทดสอบ)' });
+  logAction_('SEND_TEST_MAIL', 'OK', realEmail);
+  return jsonSafe_({ ok: true, to: realEmail });
 }
 
 function getSchedule() {
@@ -1182,15 +1217,22 @@ function logClientAction(action, result, message) {
 // memo ระดับ execution — กันการ resolve user + อ่านชีต Customers ซ้ำหลายรอบต่อ request
 // ตรวจอีเมลทุกครั้งเพื่อความปลอดภัย (Apps Script อาจ reuse instance ข้าม request/ผู้ใช้)
 var _userMemo = null;
+
 function getCurrentUser_() {
   const email = (Session.getActiveUser().getEmail() || '').toLowerCase();
   if (_userMemo && _userMemo.email === email) return _userMemo;
+  _userMemo = resolveUser_(email);
+  return _userMemo;
+}
+
+// แปลงอีเมลที่ล็อกอินเป็น user object — admin = เจ้าของชีต/ผู้พัฒนา, ไม่งั้น mail_user (เข้าได้เฉพาะหน้า training)
+function resolveUser_(email) {
   const customers = rows_(SHEETS.customers);
   let customer = customers.filter(function (row) {
     return String(row.login_email).toLowerCase() === email && row.status === 'active';
   })[0];
 
-  if (!customer && email && (ADMIN_EMAILS.indexOf(email) !== -1 || email === ownerEmail_())) {
+  if (!customer && email && (email === developerEmail_() || ADMIN_EMAILS.indexOf(email) !== -1 || email === ownerEmail_())) {
     customer = {
       customer_id: 'ADMIN',
       login_email: email,
@@ -1212,8 +1254,8 @@ function getCurrentUser_() {
     };
   }
 
-  updateLastLogin_(email);
-  _userMemo = {
+  if (email) updateLastLogin_(email);
+  return {
     email: email,
     customer_id: customer.customer_id,
     role: String(customer.role || 'mail_user').toLowerCase(),
@@ -1222,7 +1264,6 @@ function getCurrentUser_() {
     status: customer.status || 'limited',
     isAdmin: String(customer.role || '').toLowerCase() === 'admin'
   };
-  return _userMemo;
 }
 
 function requireCustomer_(user) {
@@ -1275,10 +1316,12 @@ function seedSettings_() {
 }
 
 function seedAdmin_() {
+  const dev = developerEmail_(); // เจ้าของชีต (หรือ CONFIG.developerEmail ถ้าตั้งไว้)
+  if (!dev) return; // หาเจ้าของไม่ได้ → ข้าม (getCurrentUser_ ยัง promote เจ้าของเป็น admin อยู่ดี)
   const rows = rows_(SHEETS.customers);
-  const exists = rows.some(function (row) { return String(row.login_email).toLowerCase() === APP.developer.toLowerCase(); });
+  const exists = rows.some(function (row) { return String(row.login_email).toLowerCase() === dev; });
   if (!exists) {
-    sheet_(SHEETS.customers).appendRow(['ADMIN', APP.developer.toLowerCase(), 'admin', '', APP.defaults.maxSendDay, 'active', new Date(), '']);
+    sheet_(SHEETS.customers).appendRow(['ADMIN', dev, 'admin', '', APP.defaults.maxSendDay, 'active', new Date(), '']);
   }
 }
 
@@ -1317,6 +1360,88 @@ function seedDemoSimulation_() {
   rSheet.appendRow([CID, 'mis@tfpthailand.com', 'passed', now, topic, 3]);
   rSheet.appendRow([CID, 'mis@tfpoem.com', 'clicked', now, topic, '']);
   rSheet.appendRow([CID, 'mis@tfpoem.com', 'trained', now, topic, 2]);
+}
+
+// ข้อมูลสาธิตเพื่อ "ยืนยันการแยกข้อมูลระหว่างลูกค้า 2 ราย" (idempotent — รัน setup ซ้ำได้)
+//   A = SUNART (sunart.srisumal@gmail.com)  เจ้าของโดเมน tfpthailand/tfpoem/tfpcar
+//   B = TFP    (ai.sunart.srisumal@gmail.com) มีรายชื่อ/ผลคนละชุด
+// แต่ละฝ่ายมี customer_id ของตัวเอง → scopeRows_ กรองตาม customer_id ฝ่ายหนึ่งจึงไม่เห็นข้อมูลอีกฝ่าย
+function seedIsolationDemo_() {
+  const topic = 'Link Safety';
+  const today = todayStr_();
+
+  // ลูกค้า A: เติมโดเมนที่สาม (tfpcar.com) + เป้าหมายของ tfpcar ให้กับ SUNART ที่มีอยู่เดิม
+  setCustomerDomains_('SUNART', 'tfpthailand.com,tfpoem.com,tfpcar.com');
+  if (ensureTarget_('SUNART', 'mis@tfpcar.com', 'MIS TFP Car', 'MIS')) {
+    sheet_(SHEETS.queue).appendRow(['SUNART', 'mis@tfpcar.com', topic, today, 'sent', 0, '']);
+  }
+  ensureResult_('SUNART', 'mis@tfpcar.com', 'passed', topic, 3);
+
+  // ลูกค้า B (TFP = ai.sunart.srisumal): ตามคำสั่งเจ้าของ ให้เป็นลูกค้า "ว่าง" — ไม่มี email/โดเมน
+  // ลบข้อมูลที่เคย seed ไว้ + ล้างโดเมน "ครั้งเดียว" (guard ด้วย ScriptProperties)
+  // กันไม่ให้ลบซ้ำทุกครั้งที่ setupDatabase รันใหม่หลัง cache หมดอายุ
+  const props = PropertiesService.getScriptProperties();
+  if (!props.getProperty('tfp_emptied_v1')) {
+    clearCustomerData_('TFP');
+    props.setProperty('tfp_emptied_v1', '1');
+  }
+}
+
+// ลบรายชื่อ/คิว/ผลของลูกค้ารายหนึ่งทั้งหมด แล้วล้างโดเมน (รีเซ็ตลูกค้าให้ว่าง)
+function clearCustomerData_(customerId) {
+  ['emailList', 'queue', 'results'].forEach(function (k) {
+    deleteRowsWhere_(SHEETS[k], 'customer_id', customerId);
+  });
+  setCustomerDomains_(customerId, '');
+}
+
+// ลบทุกแถวในชีตที่ค่าในคอลัมน์ field เท่ากับ value (ลบจากล่างขึ้นบนกัน index เลื่อน)
+function deleteRowsWhere_(sheetName, field, value) {
+  const sh = sheet_(sheetName);
+  const values = sh.getDataRange().getValues();
+  if (values.length < 2) return;
+  const idx = values[0].indexOf(field);
+  if (idx === -1) return;
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (String(values[i][idx]) === value) sh.deleteRow(i + 1);
+  }
+}
+
+// ตั้งค่า allowed_domains ของลูกค้ารายหนึ่งในชีต Customers (อัปเดต cell ตรง ๆ; ข้ามถ้าตรงอยู่แล้ว)
+function setCustomerDomains_(customerId, domains) {
+  const sh = sheet_(SHEETS.customers);
+  const values = sh.getDataRange().getValues();
+  const header = values[0];
+  const cidIdx = header.indexOf('customer_id');
+  const domIdx = header.indexOf('allowed_domains');
+  if (cidIdx === -1 || domIdx === -1) return;
+  for (var i = 1; i < values.length; i++) {
+    if (String(values[i][cidIdx]) === customerId) {
+      if (String(values[i][domIdx]) !== domains) sh.getRange(i + 1, domIdx + 1).setValue(domains);
+      return;
+    }
+  }
+}
+
+// เพิ่มเป้าหมายใน EmailList ถ้ายังไม่มี (คืน true เมื่อเพิ่งเพิ่ม) — กันซ้ำตาม (customer_id,email)
+function ensureTarget_(customerId, email, fullname, dept) {
+  const exists = rows_(SHEETS.emailList).some(function (r) {
+    return String(r.customer_id) === customerId && String(r.email).toLowerCase() === String(email).toLowerCase();
+  });
+  if (exists) return false;
+  sheet_(SHEETS.emailList).appendRow([customerId, email, '', 'active', '', '', '', '', fullname, dept]);
+  return true;
+}
+
+// เพิ่มผลลัพธ์ใน Results ถ้ายังไม่มีแถวเดียวกัน — กันซ้ำตาม (customer_id,email,action)
+function ensureResult_(customerId, email, action, topic, score) {
+  const exists = rows_(SHEETS.results).some(function (r) {
+    return String(r.customer_id) === customerId &&
+      String(r.email).toLowerCase() === String(email).toLowerCase() &&
+      String(r.action) === action;
+  });
+  if (exists) return;
+  sheet_(SHEETS.results).appendRow([customerId, email, action, new Date(), topic, score]);
 }
 
 function seedInitialCustomers_() {
@@ -1690,7 +1815,13 @@ function activeSpreadsheet_() {
 // เหตุผล: client รันใน iframe sandbox (googleusercontent.com) จึงใช้ location.href ไม่ได้
 // และ ScriptApp.getService().getUrl() บางครั้งคืนค่าว่าง/URL ของ sandbox → ลิงก์ training เปิดไม่ได้
 // (ขึ้นหน้า error ของ Google ไดรฟ์) จึง fix ค่านี้ไว้ให้ชัวร์
-const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzdPMQHI0NEGys7MhMFbJWEZbWc41M99wllvzDT76Q8rv-enPYVCd9KL7jhV5fRLkPD/exec';
+const WEBAPP_URL = CONFIG.webAppUrl;
+
+// URL ของ deployment "เปิด public แบบไม่ต้องล็อกอิน" สำหรับหน้า training โดยเฉพาะ (มาจาก CONFIG)
+// (deployment แยก: Execute as = Me, Who has access = Anyone — ตั้งใน Apps Script UI เพราะ clasp ตั้ง anonymous ไม่ได้)
+// ปล่อยว่าง = fallback ใช้ deployment admin เดิม (พฤติกรรมเดิม ต้องล็อกอิน)
+const TRAINING_WEBAPP_URL = CONFIG.trainingWebAppUrl;
+
 function getAppUrl_() {
   // พอร์เทเบิล: ถ้าติดตั้งบนบัญชี/สคริปต์อื่น ใช้ URL /exec ของที่นั่นเองอัตโนมัติ
   // (รับเฉพาะ URL ที่เป็น /exec จริง เพื่อกันค่าว่าง/URL ของ sandbox ที่เคยทำลิงก์พัง)
@@ -1699,6 +1830,11 @@ function getAppUrl_() {
     if (u && u.indexOf('/macros/') !== -1 && /\/exec$/.test(u)) return u;
   } catch (e) {}
   return WEBAPP_URL || ''; // fallback: ค่าที่ pin ไว้ของ deployment นี้
+}
+
+// URL สำหรับสร้างลิงก์หน้า training — ใช้ deployment anonymous ถ้าตั้งไว้, ไม่งั้น fallback เป็น admin app
+function getTrainingUrl_() {
+  return TRAINING_WEBAPP_URL || getAppUrl_();
 }
 
 // หา/สร้างชีตแบบทนทาน — กันกรณีชื่อชีตจริงมีช่องว่างหัวท้ายหรือพิมพ์เล็ก/ใหญ่ต่างกัน
@@ -1742,6 +1878,12 @@ function ownerEmail_() {
   } catch (e) {
     return '';
   }
+}
+
+// อีเมลผู้พัฒนา-admin หลัก: ใช้ค่าใน CONFIG ถ้าตั้งไว้, ไม่งั้นใช้เจ้าของชีตอัตโนมัติ
+// (ทำให้ "ก๊อปไปลงบัญชีไหน บัญชีนั้นเป็น admin + ชื่อผู้พัฒนา" โดยไม่ต้องแก้โค้ด)
+function developerEmail_() {
+  return (CONFIG.developerEmail || ownerEmail_() || '').toLowerCase();
 }
 
 function sheet_(name) {
