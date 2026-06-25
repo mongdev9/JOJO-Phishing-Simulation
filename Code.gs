@@ -818,6 +818,99 @@ function sendTestMail() {
   return jsonSafe_({ ok: true, to: realEmail });
 }
 
+// escape ข้อความ -> HTML (กันหัวข้อ/เนื้อหา MailTopic ที่ผู้ใช้พิมพ์มาทำ markup พัง)
+function escapeHtml_(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// สร้างเมลแคมเปญต่อผู้รับ 1 คน จากหัวข้อ (MailTopic ที่สุ่มให้ตอนสร้างคิว)
+// PHASE 2: ส่งจริงถึงผู้รับในลิสต์ — คงกฎความปลอดภัย: ลิงก์จบที่หน้า training, ไม่เก็บรหัสผ่าน,
+// ไม่ปลอม "ที่อยู่" ผู้ส่ง (MailApp ส่งในนามบัญชีที่รันสคริปต์เสมอ — ชื่อแสดงเป็นข้อความ ไม่ใช่ address spoof)
+function buildCampaignMail_(target, topicRow, user) {
+  const cid = user.customer_id || '';
+  const email = String(target.email || '');
+  // group ของลิงก์ = category ของหัวข้อ (ถ้าไม่ตรง 5 กลุ่ม getTrainingQuiz จะ fallback เป็นทั้งคลังเอง)
+  const group = topicRow && topicRow.category ? String(topicRow.category).toLowerCase().trim() : '';
+  // e=<อีเมลผู้รับ> เพื่อให้ Results/Report ติดตามรายคนได้ (cid ใช้ cid ไม่ใช่ c — c เป็น param สงวนของ Google)
+  const link = getTrainingUrl_() + '?page=training'
+    + '&g=' + encodeURIComponent(group)
+    + '&cid=' + encodeURIComponent(cid)
+    + '&e=' + encodeURIComponent(email);
+  const subject = (topicRow && topicRow.topic) ? String(topicRow.topic) : 'แจ้งเตือนความปลอดภัยบัญชีอีเมล';
+  const context = (topicRow && topicRow.context) ? String(topicRow.context)
+    : 'ระบบตรวจพบกิจกรรมที่ต้องยืนยันตัวตน กรุณาดำเนินการเพื่อความปลอดภัยของบัญชี';
+  const html =
+    '<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;border:1px solid #e6ece9;border-radius:10px;overflow:hidden">' +
+      '<div style="background:#1c4733;color:#fff;padding:14px 18px;font-size:16px;font-weight:bold">' + escapeHtml_(subject) + '</div>' +
+      '<div style="padding:18px">' +
+        '<p>เรียนผู้ใช้งาน</p>' +
+        '<p>' + escapeHtml_(context) + '</p>' +
+        '<p style="text-align:center;margin:22px 0">' +
+          '<a href="' + link + '" style="background:#2f8f5b;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold">ดำเนินการต่อ</a>' +
+        '</p>' +
+        '<p style="color:#7c8a83;font-size:12px;border-top:1px solid #e6ece9;padding-top:12px;margin-top:18px">' +
+          'หากมีข้อสงสัยเกี่ยวกับอีเมลฉบับนี้ ให้ตรวจสอบกับฝ่าย IT ก่อนคลิกลิงก์เสมอ' +
+        '</p>' +
+      '</div>' +
+    '</div>';
+  return { to: email, subject: subject, html: html, link: link };
+}
+
+// PHASE 2: ส่งคิวจริง — ส่งอีเมลถึงผู้รับในแถวคิวที่ status='queued' (อนุมัติโดยเจ้าของ 2026-06-25)
+// เคารพโควต้าจริงของ Gmail (MailApp.getRemainingDailyQuota) — ส่งจนหมดโควต้าแล้วหยุด ที่เหลือคงเป็น queued
+// อัปเดตสถานะรายแถว: sent / failed(+last_error,+retry_count). admin=ทุกแถว · customer=เฉพาะของตัวเอง
+function sendQueuedNow() {
+  setupDatabase();
+  const user = getCurrentUser_();
+  requireCustomer_(user);
+
+  const sheet = sheet_(SHEETS.queue);
+  const data = sheet.getDataRange().getValues();
+  const idx = {};
+  HEADERS.Queue.forEach(function (h, i) { idx[h] = i; });
+
+  // lookup หัวข้อจากชื่อ (เพื่อดึง context/category ไปสร้างเนื้อเมล)
+  const topicByName = {};
+  rows_(SHEETS.mailTopics).forEach(function (t) { topicByName[String(t.topic).toLowerCase().trim()] = t; });
+
+  let remaining = MailApp.getRemainingDailyQuota(); // เพดานจริงของ Gmail วันนี้
+  let sent = 0, failed = 0, skipped = 0;
+
+  for (let r = 1; r < data.length; r++) {
+    if (String(data[r][idx.status] || '').toLowerCase() !== 'queued') continue;
+    if (user.role === 'customer' && String(data[r][idx.customer_id]) !== String(user.customer_id)) continue;
+    if (remaining <= 0) { skipped++; continue; } // โควต้า Gmail หมด — ปล่อยคงสถานะ queued ไว้
+
+    const email = String(data[r][idx.email] || '');
+    if (!isValidEmail_(email)) {
+      sheet.getRange(r + 1, idx.status + 1).setValue('failed');
+      sheet.getRange(r + 1, idx.last_error + 1).setValue('invalid email');
+      failed++; continue;
+    }
+    const topicRow = topicByName[String(data[r][idx.topic] || '').toLowerCase().trim()] || null;
+    try {
+      const m = buildCampaignMail_({ email: email }, topicRow, user);
+      MailApp.sendEmail({ to: m.to, subject: m.subject, htmlBody: m.html, name: 'IT Support' });
+      sheet.getRange(r + 1, idx.status + 1).setValue('sent');
+      remaining--; sent++;
+    } catch (e) {
+      const rc = Number(data[r][idx.retry_count] || 0) + 1;
+      sheet.getRange(r + 1, idx.retry_count + 1).setValue(rc);
+      sheet.getRange(r + 1, idx.last_error + 1).setValue(String((e && e.message) || e));
+      sheet.getRange(r + 1, idx.status + 1).setValue('failed');
+      failed++;
+    }
+  }
+
+  logAction_('SEND_QUEUE', 'OK', 'sent=' + sent + ', failed=' + failed + ', skipped=' + skipped);
+  return jsonSafe_({
+    sent: sent, failed: failed, skipped: skipped,
+    queue: listQueue(), dashboard: getDashboardData(), quota: computeQuota_(user)
+  });
+}
+
 function getSchedule() {
   setupDatabase();
   const user = getCurrentUser_();

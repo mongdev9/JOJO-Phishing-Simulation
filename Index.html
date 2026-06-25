@@ -688,6 +688,7 @@
             </label>`).join('')
         : '<span class="muted">ยังไม่มีหัวข้อที่เปิดใช้งาน — ไปเปิดที่หน้า Topics ก่อน</span>';
       const max = Math.max(q.available, 0);
+      const queuedCount = (state.data.queue || []).filter((r) => String(r.status).toLowerCase() === 'queued').length;
       document.getElementById('Send Mail').innerHTML = `
         <div class="stats">
           ${statHtml('Send Today', q.available)}
@@ -698,7 +699,7 @@
         <div class="section">
           <div class="section-title">สร้างแคมเปญจำลอง (Campaign)</div>
           <div class="section-body">
-            <div class="message">Phase 1 สร้างเฉพาะคิว (ลิงก์ปลายทางเป็นหน้าอบรมเท่านั้น) ยังไม่ส่งอีเมลจริง</div>
+            <div class="message">สร้างคิวก่อน (สุ่มหัวข้อ + รายชื่อ) แล้วกด "ส่งคิวจริง" ที่ตารางคิวด้านล่างเพื่อส่งอีเมลออกจริง · ลิงก์ปลายทางเป็นหน้าอบรมเท่านั้น</div>
             <p class="muted">โควต้าวันนี้: ส่งได้อีก <b>${Number(q.available)}</b> (เพดานคุณ ${Number(q.customer_remaining)}/${Number(q.customer_cap)} · ทั้งระบบเหลือ ${Number(q.platform_remaining)}/${Number(q.platform_cap)})</p>
             <label>เลือกหัวข้อที่จะสุ่มส่ง</label>
             <div style="margin:6px 0 12px;">${topicChecks}</div>
@@ -720,7 +721,13 @@
         </div>
         <div class="section">
           <div class="section-title">คิวทั้งหมด</div>
-          <div class="section-body"><div class="table-wrap">${tableHtml(state.data.queue, ['customer_id','email','topic','send_date','status','retry_count','last_error'])}</div></div>
+          <div class="section-body">
+            <div class="actions" style="margin-bottom:8px;">
+              <button class="btn" onclick="sendQueue()" ${queuedCount > 0 ? '' : 'disabled'}>✉ ส่งคิวจริง (${queuedCount} รายการรอส่ง)</button>
+              <span id="sendQueueMsg" class="muted"></span>
+            </div>
+            <div class="table-wrap">${tableHtml(state.data.queue, ['customer_id','email','topic','send_date','status','retry_count','last_error'])}</div>
+          </div>
         </div>
       `;
     }
@@ -1705,6 +1712,28 @@
         })
         .withFailureHandler((err) => setMsg('sendMsg', err.message || String(err), true))
         .createRandomQueue({ count, topics });
+    }
+
+    // PHASE 2: ส่งคิวจริง — ส่งอีเมลออกจริงไปยังแถวคิวที่ status='queued' (มี confirm กันพลาด)
+    function sendQueue() {
+      const queued = (state.data.queue || []).filter((r) => String(r.status).toLowerCase() === 'queued').length;
+      if (queued < 1) { setMsg('sendQueueMsg', 'ไม่มีรายการรอส่งในคิว', true); return; }
+      if (!confirm(`ยืนยันส่งอีเมลจริงไปยัง ${queued} รายชื่อในคิว?\nลิงก์ในเมลจะพาไปหน้าอบรมเท่านั้น`)) return;
+      setMsg('sendQueueMsg', 'กำลังส่ง...', false);
+      google.script.run
+        .withSuccessHandler((res) => {
+          state.data.queue = res.queue;
+          state.data.dashboard = res.dashboard;
+          if (res.quota) state.data.quota = res.quota;
+          renderSendMail();
+          renderResults();
+          let msg = `ส่งสำเร็จ ${res.sent} ฉบับ`;
+          if (res.failed) msg += ` · ล้มเหลว ${res.failed}`;
+          if (res.skipped) msg += ` · ค้างเพราะโควต้า Gmail หมด ${res.skipped}`;
+          setMsg('sendQueueMsg', msg, !!res.failed);
+        })
+        .withFailureHandler((err) => setMsg('sendQueueMsg', err.message || String(err), true))
+        .sendQueuedNow();
     }
 
     function exportLogs() {
