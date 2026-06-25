@@ -488,6 +488,7 @@
         <section id="Login Customer" class="view"></section>
         <section id="Simulation" class="view hidden"></section>
         <section id="Email List" class="view hidden"></section>
+        <section id="Send Mail" class="view hidden"></section>
         <section id="Training Page" class="view hidden"></section>
         <section id="Results" class="view hidden"></section><!-- Quota ย้ายมาแสดงในหน้านี้แล้ว -->
         <section id="Report" class="view hidden"></section>
@@ -507,7 +508,7 @@
       active: 'Login Customer',
       data: null,
       entered: false,
-      nav: ['Login Customer', 'Simulation', 'Results', 'Report', 'Schedule', 'Email List', 'Training Page']
+      nav: ['Login Customer', 'Simulation', 'Email List', 'Send Mail', 'Results', 'Report', 'Schedule', 'Training Page']
     };
 
     const NAV_LABELS = {
@@ -516,6 +517,7 @@
       'Report': 'Report',
       'Schedule': 'Schedule',
       'Email List': 'Email',
+      'Send Mail': 'Campaign',
       'Training Page': 'Training',
       'Results': 'Result'
     };
@@ -527,6 +529,7 @@
       'Report': '📈',
       'Schedule': '📅',
       'Email List': '✉️',
+      'Send Mail': '📧',
       'Training Page': '🎓'
     };
 
@@ -619,6 +622,7 @@
       const layout = document.querySelector('.layout');
       if (layout) layout.classList.toggle('no-sidebar', !isAuthed());
       if (name === 'Simulation' && isAuthed()) renderSimulation();
+      if (name === 'Send Mail' && isAuthed()) renderSendMail();
       if (name === 'Report' && isAuthed()) renderReport();
       if (name === 'Schedule' && isAuthed()) renderSchedule();
       google.script.run.logClientAction('OPEN_TAB', 'OK', name);

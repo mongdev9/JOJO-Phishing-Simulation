@@ -165,6 +165,10 @@ GitHub (private): https://github.com/mongdev9/JOJO-Phishing-Simulation
     * หมายเหตุ: ชื่อแสดงผู้ส่งตั้งเป็น "IT Support" (เป็นข้อความ ไม่ใช่
       การปลอม address) เปลี่ยนได้ใน buildCampaignMail_ -> MailApp name
 
+หมายเหตุ: หน้า Send Mail (Campaign) เคยหลุดจากเมนูตอน refactor
+  single-tenant -> เพิ่มกลับเข้า nav แล้ว (แท็บ "Campaign" 📧)
+  อยู่ระหว่าง Email -> Campaign -> Result
+
 วิธีใช้:
   1. หน้า Send Mail (Campaign) -> เลือกหัวข้อ + จำนวน -> "สร้างคิวแคมเปญ"
      (สุ่มหัวข้อจาก MailTopics + สุ่มรายชื่อ active, เคารพโควต้า)
