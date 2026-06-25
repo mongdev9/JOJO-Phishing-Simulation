@@ -1208,7 +1208,7 @@
         ${hasQuiz ? '<div class="actions"><button class="btn" id="simSubmit" onclick="simSubmit()">ส่งคำตอบ</button></div>' : ''}
         <div id="simQuizResult"></div>`;
       const step6 = `
-        <div class="message">🎉 จบการจำลอง! คุณตอบถูก <b>${s.score}/${s.quiz.length}</b> ข้อ — <b>ผ่าน</b></div>
+        <div class="message">🎉 จบการจำลอง! คุณตอบถูก <b>${s.score}/${s.quiz ? s.quiz.length : 0}</b> ข้อ — <b>ผ่าน</b></div>
         <p><b>สรุปสิ่งที่เกิดขึ้น:</b> ส่งเมลจำลอง → อ่านเมล → กดลิงก์ (โดนหลอก) → เรียนรู้วิธีระวัง → ทำแบบทดสอบผ่าน</p>
         <p class="muted">ถ้าเจอแบบนี้ของจริง อย่ากดลิงก์ ให้ตรวจสอบกับต้นทางและรายงาน IT เสมอ</p>
         <div class="actions"><button class="btn secondary" onclick="simRestart()">↺ เริ่มจำลองใหม่</button></div>`;

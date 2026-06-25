@@ -132,8 +132,23 @@ GitHub (private): https://github.com/mongdev9/JOJO-Phishing-Simulation
             คนที่มีผลอบรมแต่ไม่อยู่ใน EmailList เข้ารายงานด้วย
     ผล:     คะแนนในชีต Results ขึ้นครบในหน้า Report
 
+[3] แก้บั๊ก: หน้า Simulation ว่างเปล่า
+    สาเหตุ: renderSimulation() สร้าง step6 ด้วย ${s.quiz.length}
+            แต่ตอนเปิดครั้งแรก s.quiz = null -> template literal
+            คำนวณทันที -> null.length โยน TypeError -> ฟังก์ชันพัง
+            ก่อน set innerHTML -> หน้าว่าง
+    แก้:    Index.html เปลี่ยนเป็น ${s.quiz ? s.quiz.length : 0}
+            (null-safe)
+    ผล:     หน้า Simulation แสดง 6 การ์ดขั้นตอนได้ปกติ
+
 ** ต้องทำหลังแก้: วางทับ Code.gs + Index ใน Apps Script -> Save
    -> redeploy version ใหม่ทั้ง Admin และ Training (ผ่าน UI เท่านั้น)
    โค้ดใหม่จะไม่มีผลจนกว่าจะออก version ใหม่ **
+
+----- สถานะยืนยันแล้ว (2026-06-25) -----
+- หน้า training ขึ้นปกติหลัง redeploy : OK
+- หน้า Simulation แสดง 6 การ์ด        : OK
+- ค้าง: ใส่ trainingWebAppUrl เพื่อให้ลิงก์ในเมลเปิดหน้าอบรม
+        แบบไม่ต้องล็อกอิน (ตอนนี้ยังชี้ไป deployment Admin)
 
 ============================================================
