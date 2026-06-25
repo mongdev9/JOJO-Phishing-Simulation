@@ -110,4 +110,30 @@ GitHub (private): https://github.com/mongdev9/JOJO-Phishing-Simulation
    ** ห้ามทำโดยไม่มีคำสั่งชัดเจน: spoof ผู้ส่ง, clone หน้า login,
       เก็บรหัสผ่าน/credential — เป็นข้อห้ามระดับโปรเจค **
 
+
+------------------------------------------------------------
+ 5) บันทึกการแก้ไขล่าสุด (2026-06-25 รอบที่ 2)
+------------------------------------------------------------
+
+[1] แก้บั๊ก: หน้า training ไม่ขึ้น / เด้งไปหน้า admin
+    สาเหตุ: Apps Script รันหน้าเว็บใน iframe ที่ไม่พา query param
+            (page/cid/g/t/e/name) ติดไปด้วย -> location.search ว่าง
+            -> client เข้าใจผิดว่าเป็นหน้า admin
+    แก้:    - Code.gs (doGet) ฉีด params เข้า template ผ่าน paramsJson
+            - Index.html อ่านจาก SERVER_PARAMS ก่อน แล้ว fallback
+              ไป location.search
+    ผล:     หน้า training ขึ้นถูกต้อง + quiz ได้ค่า g/cid ครบ
+
+[2] แก้บั๊ก: หน้า Report คะแนนอบรมไม่ขึ้น (ทั้งที่ Excel มีคะแนน)
+    สาเหตุ: getReportData() ข้ามแถวที่ email ว่าง และ join รายชื่อ
+            ด้วย email อย่างเดียว -> คนที่อบรมผ่านลิงก์ anonymous
+            (มีแต่ชื่อ ไม่มี email) เลยไม่เคยโผล่ในรายงาน
+    แก้:    getReportData() ใช้ชื่อเป็นคีย์เมื่อ email ว่าง และเพิ่ม
+            คนที่มีผลอบรมแต่ไม่อยู่ใน EmailList เข้ารายงานด้วย
+    ผล:     คะแนนในชีต Results ขึ้นครบในหน้า Report
+
+** ต้องทำหลังแก้: วางทับ Code.gs + Index ใน Apps Script -> Save
+   -> redeploy version ใหม่ทั้ง Admin และ Training (ผ่าน UI เท่านั้น)
+   โค้ดใหม่จะไม่มีผลจนกว่าจะออก version ใหม่ **
+
 ============================================================

@@ -530,7 +530,18 @@
       'Training Page': '🎓'
     };
 
-    const params = new URLSearchParams(location.search);
+    // พารามิเตอร์ที่ server ฉีดมา (กัน Apps Script iframe ทำ location.search ว่าง → page/cid/g/t/e/name หาย)
+    const SERVER_PARAMS = (function () {
+      try { return <?!= paramsJson ?>; } catch (e) { return {}; }
+    })();
+    const params = (function () {
+      const p = new URLSearchParams(location.search);
+      // เติมค่าที่ขาดด้วยค่าจาก server (ฝั่ง iframe มักได้ location.search ว่าง)
+      Object.keys(SERVER_PARAMS || {}).forEach(function (k) {
+        if (!p.get(k) && SERVER_PARAMS[k] != null && SERVER_PARAMS[k] !== '') p.set(k, SERVER_PARAMS[k]);
+      });
+      return p;
+    })();
     const isTrainingRoute = params.get('page') === 'training';
 
     document.addEventListener('DOMContentLoaded', () => {

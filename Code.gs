@@ -88,17 +88,20 @@ const HEADERS = {
 };
 
 function doGet(e) {
-  const page = e && e.parameter && e.parameter.page;
+  const params = (e && e.parameter) || {};
+  const page = params.page;
+  const t = HtmlService.createTemplateFromFile('Index');
+  // ฉีดพารามิเตอร์ฝั่ง server เข้า template — กัน Apps Script iframe ทำ location.search ว่าง
+  // (page/g/t/cid/e/name หายใน iframe ทำให้หน้า training ไม่ขึ้น/เด้งไปหน้า admin) — client อ่านจาก SERVER_PARAMS
+  t.paramsJson = JSON.stringify(params);
   if (page === 'training') {
-    return HtmlService.createTemplateFromFile('Index')
-      .evaluate()
+    return t.evaluate()
       .setTitle(APP.name + ' Training')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
 
   setupDatabase();
-  return HtmlService.createTemplateFromFile('Index')
-    .evaluate()
+  return t.evaluate()
     .setTitle(APP.name)
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
@@ -501,12 +504,22 @@ function getReportData() {
   const targets = scopeRows_(rows_(SHEETS.emailList), 'customer_id', user);
   const results = scopeRows_(rows_(SHEETS.results), 'customer_id', user);
 
-  // รวมผลต่ออีเมล
-  const byEmail = {};
+  // คีย์ของ "คน": ใช้ email ถ้ามี, ไม่งั้นใช้ชื่อ — คนที่อบรมผ่านลิงก์ anonymous มักไม่มี email มีแต่ชื่อ
+  // (เดิมข้ามแถว email ว่าง ทำให้คะแนนคนกลุ่มนี้ไม่ขึ้นใน Report ทั้งที่บันทึกในชีต Results แล้ว)
+  function keyOf_(email, name) {
+    const e = String(email || '').toLowerCase().trim();
+    if (e) return 'e:' + e;
+    const n = String(name || '').toLowerCase().trim();
+    return n ? 'n:' + n : '';
+  }
+
+  // รวมผลต่อคน (จากชีต Results)
+  const agg = {};
   results.forEach(function (r) {
-    const e = String(r.email || '').toLowerCase();
-    if (!e) return;
-    const o = byEmail[e] || (byEmail[e] = { clicked: false, trained: false, passed: false, score: 0 });
+    const k = keyOf_(r.email, r.name);
+    if (!k) return;
+    const o = agg[k] || (agg[k] = { email: String(r.email || ''), name: String(r.name || ''), clicked: false, trained: false, passed: false, score: 0 });
+    if (!o.name && r.name) o.name = String(r.name);
     const a = String(r.action || '').toLowerCase();
     if (a === 'clicked') o.clicked = true;
     if (a === 'trained' || a === 'passed') { o.trained = true; o.clicked = true; }
@@ -515,13 +528,27 @@ function getReportData() {
     if (!isNaN(sc) && sc > o.score) o.score = sc;
   });
 
+  // 1) คนในรายชื่อเป้าหมาย (EmailList) — join ผลด้วย email
+  const used = {};
   const people = targets.map(function (t) {
-    const e = String(t.email || '').toLowerCase();
-    const o = byEmail[e] || { clicked: false, trained: false, passed: false, score: 0 };
+    const k = keyOf_(t.email, '');
+    const hit = k && agg[k];
+    if (hit) used[k] = true;
+    const o = hit || { clicked: false, trained: false, passed: false, score: 0 };
     return {
       email: t.email, fullname: t.fullname || '', department: t.department || '',
       clicked: o.clicked, trained: o.trained, passed: o.passed, score: o.score
     };
+  });
+
+  // 2) คนที่มีผลอบรมแต่ไม่อยู่ในรายชื่อเป้าหมาย (อบรมผ่านลิงก์ตรง/กรอกแค่ชื่อ) — ไม่ให้คะแนนหาย
+  Object.keys(agg).forEach(function (k) {
+    if (used[k]) return;
+    const o = agg[k];
+    people.push({
+      email: o.email || '', fullname: o.name || '(ไม่ระบุชื่อ)', department: '',
+      clicked: o.clicked, trained: o.trained, passed: o.passed, score: o.score
+    });
   });
 
   return jsonSafe_({
