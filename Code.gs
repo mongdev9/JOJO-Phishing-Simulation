@@ -13,11 +13,11 @@ const CONFIG = {
   spreadsheetId: '',
 
   // URL /exec ของ deployment แอด admin — ปล่อย '' ได้ ระบบ auto-detect จาก ScriptApp.getService().getUrl()
-  webAppUrl: '',
+  webAppUrl: 'https://script.google.com/macros/s/AKfycbwZUn0VuOPK2_gwnK7ja99Y7KAR2i4-qzKzPAcAwvHJmPB_HRAmPxDa6HRGF3-W9njE/exec',
 
   // URL /exec ของ deployment training แบบ "ทุกคน/ไม่ต้องล็อกอิน" (Execute as Me + Anyone)
   // ปล่อย '' = ใช้ webAppUrl แทน (แต่จะกลายเป็นต้องล็อกอิน) — ดู [[anonymous-training-deployment]]
-  trainingWebAppUrl: '',
+  trainingWebAppUrl: 'https://script.google.com/macros/s/AKfycbxEf6R83vL_F5du52zTWQmG0ZLoT0yYbx0NoMJpX3EZj8icv-xAKd-L6eWsJjvzwwJClA/exec',
 
   // seed ข้อมูลสาธิต (ลูกค้า SUNART/TFP + อีเมล/ผลตัวอย่าง) — ติดตั้งใช้งานจริงให้ตั้ง false เพื่อ DB สะอาด
   seedDemo: false

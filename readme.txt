@@ -145,10 +145,19 @@ GitHub (private): https://github.com/mongdev9/JOJO-Phishing-Simulation
    -> redeploy version ใหม่ทั้ง Admin และ Training (ผ่าน UI เท่านั้น)
    โค้ดใหม่จะไม่มีผลจนกว่าจะออก version ใหม่ **
 
+[4] ใส่ URL deployment จริงลง CONFIG (sync repo ให้ตรงของที่รันอยู่)
+    - webAppUrl         = URL ตัว Admin
+    - trainingWebAppUrl = URL ตัว Training (Execute as Me + Anyone)
+    ผล: ลิงก์ในเมลชี้ไปหน้า training โดยตรง เปิดได้ไม่ต้องล็อกอิน
+    หมายเหตุ: ถ้าก๊อป repo ไปติดตั้งบนชีต/บัญชีอื่น ต้องเปลี่ยน 2 URL
+             นี้เป็นของ deployment ตัวเอง (ดูขั้นตอน Deploy ด้านบน)
+
 ----- สถานะยืนยันแล้ว (2026-06-25) -----
-- หน้า training ขึ้นปกติหลัง redeploy : OK
-- หน้า Simulation แสดง 6 การ์ด        : OK
-- ค้าง: ใส่ trainingWebAppUrl เพื่อให้ลิงก์ในเมลเปิดหน้าอบรม
-        แบบไม่ต้องล็อกอิน (ตอนนี้ยังชี้ไป deployment Admin)
+- หน้า training ขึ้นปกติหลัง redeploy           : OK
+- หน้า Simulation แสดง 6 การ์ด                  : OK
+- หน้า Report คะแนนขึ้นครบ                       : OK
+- ส่งเมลทดสอบเข้า Gmail                          : OK
+- กดลิงก์ในเมล -> หน้า training ไม่ต้องล็อกอิน   : OK
+=> flow ครบวงจรใช้งานได้จริงตั้งแต่ต้นจนจบ
 
 ============================================================
