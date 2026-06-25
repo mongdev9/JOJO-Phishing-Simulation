@@ -486,8 +486,8 @@
 
       <main>
         <section id="Login Customer" class="view"></section>
+        <section id="Simulation" class="view hidden"></section>
         <section id="Email List" class="view hidden"></section>
-        <section id="Mail Topics" class="view hidden"></section>
         <section id="Training Page" class="view hidden"></section>
         <section id="Results" class="view hidden"></section><!-- Quota ย้ายมาแสดงในหน้านี้แล้ว -->
         <section id="Report" class="view hidden"></section>
@@ -507,26 +507,26 @@
       active: 'Login Customer',
       data: null,
       entered: false,
-      nav: ['Login Customer', 'Results', 'Report', 'Schedule', 'Email List', 'Mail Topics', 'Training Page']
+      nav: ['Login Customer', 'Simulation', 'Results', 'Report', 'Schedule', 'Email List', 'Training Page']
     };
 
     const NAV_LABELS = {
       'Login Customer': 'Login',
+      'Simulation': 'Simulation',
       'Report': 'Report',
       'Schedule': 'Schedule',
       'Email List': 'Email',
-      'Mail Topics': 'Group',
       'Training Page': 'Training',
       'Results': 'Result'
     };
 
     const NAV_ICONS = {
       'Login Customer': '🔑',
+      'Simulation': '🎬',
       'Results': '📊',
       'Report': '📈',
       'Schedule': '📅',
       'Email List': '✉️',
-      'Mail Topics': '🎯',
       'Training Page': '🎓'
     };
 
@@ -551,8 +551,8 @@
 
     function loadData() {
       const watchdog = setTimeout(() => {
-        showFatal('ติดต่อ server ไม่สำเร็จใน 30 วินาที — ตรวจ Authorization (เปิดครั้งแรกต้องกด Authorize) หรือ Deploy version. ดู Apps Script > Executions ว่ามี getBootstrap หรือไม่');
-      }, 30000);
+        showFatal('ติดต่อ server ไม่สำเร็จใน 60 วินาที — ตรวจ Authorization (เปิดครั้งแรกต้องกด Authorize) หรือ Deploy version. ดู Apps Script > Executions ว่ามี getBootstrap หรือไม่');
+      }, 60000);
       google.script.run
         .withSuccessHandler((data) => {
           clearTimeout(watchdog);
@@ -579,7 +579,6 @@
       renderNav();
       renderLogin();
       renderEmailList();
-      renderTopics();
       renderTrainingPanel();
       renderResults();
       showView(state.active);
@@ -608,6 +607,7 @@
       // ซ่อน bar ซ้ายทั้งแถบจนกว่าจะ login ผ่าน bar กลาง (เห็น bar กลางก่อนเสมอ)
       const layout = document.querySelector('.layout');
       if (layout) layout.classList.toggle('no-sidebar', !isAuthed());
+      if (name === 'Simulation' && isAuthed()) renderSimulation();
       if (name === 'Report' && isAuthed()) renderReport();
       if (name === 'Schedule' && isAuthed()) renderSchedule();
       google.script.run.logClientAction('OPEN_TAB', 'OK', name);
@@ -842,10 +842,10 @@
         </tr>`;
       }).join('');
 
-      // ปุ่มเลือกกลุ่ม (คลิก)
-      const groupBtns = groups.map((g) =>
-        `<button type="button" class="gbtn${state.qForm.group === g.code ? ' sel' : ''}" data-g="${escapeAttr(g.code)}" onclick="selectQGroup('${escapeAttr(g.code)}')">${escapeHtml(g.label)}</button>`
-      ).join('');
+      // ตัวเลือกกลุ่ม (selectbox) — รวมกลุ่มที่ผู้ใช้เพิ่มเอง + ตัวเลือก "เพิ่มกลุ่มใหม่"
+      const groupOptions = groups.map((g) =>
+        `<option value="${escapeAttr(g.code)}">${escapeHtml(g.label)}</option>`
+      ).join('') + '<option value="__new__">➕ เพิ่มกลุ่มใหม่…</option>';
 
       // แถวตัวเลือก (คลิก radio = ข้อที่ถูก)
       let choiceRows = '';
@@ -882,9 +882,18 @@
         </tr>`;
       }).join('');
 
+      const randomLink = `${base}?page=training&cid=${encodeURIComponent(cid)}`;
       const testHtml = `
         <div class="section">
-          <div class="section-title">▶ ทดสอบ — เปิด/คัดลอกลิงก์แบบทดสอบของแต่ละกลุ่ม (สุ่ม 3 ข้อต่อครั้ง)</div>
+          <div class="section-title">▶ ทดสอบ</div>
+          <div class="section-body" style="text-align:center;">
+            <p class="muted">สุ่มคำถามจากทุกกลุ่ม 3 ข้อ แล้วเข้าหน้าอบรมทันที</p>
+            <button class="btn" style="font-size:17px;padding:14px 30px;" data-link="${escapeAttr(randomLink)}" onclick="openLink(this)">▶ เริ่มทดสอบ (สุ่ม 3 ข้อ)</button>
+            <button class="btn secondary" data-link="${escapeAttr(randomLink)}" onclick="copyLink(this)" style="margin-left:8px;">คัดลอกลิงก์สุ่ม</button>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">หรือเลือกทดสอบเฉพาะกลุ่ม</div>
           <div class="section-body">
             <p class="muted">ลิงก์จบที่หน้าอบรมเสมอ · เปิดทดสอบเอง หรือคัดลอกลิงก์ไปส่งให้พนักงานได้</p>
             <div class="table-wrap"><table class="tbl-auto">
@@ -898,8 +907,9 @@
         <div class="section">
           <div class="section-title">➕ เพิ่มคำถามใหม่ (คลิกเลือกได้เลย ไม่ต้องพิมพ์สัญลักษณ์)</div>
           <div class="section-body">
-            <p><b>1. เลือกกลุ่ม</b> (คลิก)</p>
-            <div>${groupBtns}</div>
+            <p><b>1. เลือกกลุ่ม</b></p>
+            <select id="nqGroupSel" onchange="onGroupSelChange()">${groupOptions}</select>
+            <input id="nqGroupNew" placeholder="พิมพ์ชื่อกลุ่มใหม่ แล้วกดบันทึกคำถาม" style="display:none;margin-top:8px;">
             <p style="margin-top:14px;"><b>2. พิมพ์คำถาม</b></p>
             <input id="nqQuestion" placeholder="เช่น  ได้รับอีเมลให้กดลิงก์ยืนยันบัญชีด่วน ควรทำอย่างไร?">
             <p style="margin-top:14px;"><b>3. ใส่ตัวเลือก แล้วคลิกวงกลมหน้า "ข้อที่ถูก"</b></p>
@@ -994,27 +1004,88 @@
     }
 
     function renderResults() {
-      const q = (state.data && state.data.quota) || {};
+      const d = (state.data && state.data.dashboard) || {};
+
+      // คิวส่งเมล — แบบบัตรคิว: รอส่งเรียงลำดับ 1,2,3… (ตาม send_date) ส่งแล้วหล่นลงไปจาง ๆ
+      // ส่งคิว 1 เสร็จ (สถานะเปลี่ยนจาก queued) แล้ว refresh → คิว 2 เลื่อนขึ้นเป็น 1 อัตโนมัติ
+      const SEQ_TH = '<th style="width:64px;text-align:center;">คิวที่</th>';
+      const queue = (state.data.queue || []).slice();
+      const isQueued = (q) => String(q.status || '').toLowerCase() === 'queued';
+      const pending = queue.filter(isQueued)
+        .sort((a, b) => String(a.send_date).localeCompare(String(b.send_date)));
+      const doneQ = queue.filter((q) => !isQueued(q));
+      const qRow = (seq, q, done) => `
+        <tr${done ? ' style="opacity:.5;"' : ''}>
+          <td style="text-align:center;font-weight:700;color:${done ? '#9aa' : '#2f8f5b'};">${seq}</td>
+          <td>${escapeHtml(q.email || '')}</td>
+          <td>${escapeHtml(q.topic || '')}</td>
+          <td>${escapeHtml(formatCell(q.send_date))}</td>
+          <td>${done ? '<span class="pill">ส่งแล้ว</span>' : '<span class="pill warn">รอส่ง</span>'}</td>
+        </tr>`;
+      // แบ่งหน้า 20 แถว — คิวรวม pending (เลขลำดับจริง) + done (✓) เลขลำดับต่อเนื่องข้ามหน้า
+      const PER = 20;
+      const qAll = pending.map((q, i) => ({ seq: i + 1, q: q, done: false }))
+        .concat(doneQ.map((q) => ({ seq: '✓', q: q, done: true })));
+      const qPages = Math.max(1, Math.ceil(qAll.length / PER));
+      state.resQPage = Math.min(Math.max(0, state.resQPage || 0), qPages - 1);
+      const qBody = qAll.slice(state.resQPage * PER, state.resQPage * PER + PER)
+        .map((x) => qRow(x.seq, x.q, x.done)).join('');
+
+      // ผลการอบรม — ใส่เลขลำดับเหมือนระบบคิว (เรียงใหม่ล่าสุดอยู่บน) ช่องไฟคอลัมน์แรกตรงกับตารางคิว
+      const results = (state.data.results || []).slice()
+        .sort((a, b) => String(b.action_time).localeCompare(String(a.action_time)));
+      const rPages = Math.max(1, Math.ceil(results.length / PER));
+      state.resRPage = Math.min(Math.max(0, state.resRPage || 0), rPages - 1);
+      const rStart = state.resRPage * PER;
+      const rBody = results.slice(rStart, rStart + PER).map((r, i) => `
+        <tr>
+          <td style="text-align:center;font-weight:700;color:#2f8f5b;">${rStart + i + 1}</td>
+          <td>${escapeHtml(r.name || '')}</td>
+          <td>${escapeHtml(r.email || '')}</td>
+          <td>${escapeHtml(r.action || '')}</td>
+          <td>${escapeHtml(r.topic || '')}</td>
+          <td>${escapeHtml(r.score)}</td>
+          <td>${escapeHtml(formatCell(r.action_time))}</td>
+        </tr>`).join('');
+
+      const pager = (page, pages, total, fn) => `
+        <div class="actions" style="justify-content:space-between;margin-top:10px;">
+          <button class="btn secondary" onclick="${fn}(-1)" ${page <= 0 ? 'disabled' : ''}>‹ ก่อนหน้า</button>
+          <span class="muted">หน้า ${page + 1}/${pages} · ทั้งหมด ${total} แถว</span>
+          <button class="btn secondary" onclick="${fn}(1)" ${page >= pages - 1 ? 'disabled' : ''}>ถัดไป ›</button>
+        </div>`;
+
       document.getElementById('Results').innerHTML = `
-        ${statsHtml(state.data.dashboard)}
+        <div class="stats" style="grid-template-columns:repeat(2,minmax(0,1fr));">
+          ${statHtml('Clicked', d.clicked)}
+          ${statHtml('Trained', d.trained)}
+        </div>
         <div class="section">
           <div class="section-title">โควต้าส่งวันนี้ (Gmail ฟรี 100 ฉบับ/วัน)</div>
           <div class="section-body">
-            <div class="stats" style="grid-template-columns:repeat(3,minmax(0,1fr));">
-              ${statHtml('ส่งได้อีก', q.available)}
-              ${statHtml('ส่งไปแล้ววันนี้', q.platform_today)}
-              ${statHtml('เพดาน/วัน', q.platform_cap)}
-            </div>
-            <p class="muted">โควต้าจริงของ Google เหลือวันนี้: <b id="gQuota">กำลังตรวจสอบ…</b></p>
+            <p class="muted">ส่งได้อีกวันนี้: <b id="gQuota">กำลังตรวจสอบ…</b></p>
           </div>
         </div>
         <div class="section">
-          <div class="section-title">ผลการอบรม / ผลประเมิน</div>
-          <div class="section-body"><div class="table-wrap">${tableHtml(state.data.results, ['email','action','topic','score','action_time'])}</div></div>
+          <div class="section-title">คิวส่งเมล — รอส่ง ${pending.length} รายการ</div>
+          <div class="section-body">
+            <p class="muted">เรียงตามลำดับคิว · เมื่อส่งคิวที่ 1 แล้ว กด refresh คิวถัดไปจะเลื่อนขึ้นเป็นลำดับ 1 · แสดงทีละ ${PER} แถว</p>
+            <div class="table-wrap"><table class="tbl-auto">
+              <thead><tr>${SEQ_TH}<th>อีเมล</th><th>หัวข้อ</th><th>กำหนดส่ง</th><th>สถานะ</th></tr></thead>
+              <tbody>${qBody || '<tr><td colspan="5" class="muted">ยังไม่มีคิว</td></tr>'}</tbody>
+            </table></div>
+            ${qAll.length > PER ? pager(state.resQPage, qPages, qAll.length, 'resQueuePage') : ''}
+          </div>
         </div>
         <div class="section">
-          <div class="section-title">คิวที่กำหนดส่ง</div>
-          <div class="section-body"><div class="table-wrap">${tableHtml(state.data.queue, ['email','topic','send_date','status'])}</div></div>
+          <div class="section-title">ผลการอบรม / ผลประเมิน — ${results.length} รายการ</div>
+          <div class="section-body">
+            <div class="table-wrap"><table class="tbl-auto">
+              <thead><tr>${SEQ_TH}<th>ชื่อ</th><th>อีเมล</th><th>การกระทำ</th><th>หัวข้อ</th><th>คะแนน</th><th>เวลา</th></tr></thead>
+              <tbody>${rBody || '<tr><td colspan="7" class="muted">ยังไม่มีผล</td></tr>'}</tbody>
+            </table></div>
+            ${results.length > PER ? pager(state.resRPage, rPages, results.length, 'resResultPage') : ''}
+          </div>
         </div>
       `;
       google.script.run
@@ -1022,6 +1093,219 @@
         .withFailureHandler(() => { const el = document.getElementById('gQuota'); if (el) el.textContent = 'ตรวจสอบไม่ได้'; })
         .getGoogleMailQuota();
     }
+
+    function resQueuePage(delta) { state.resQPage = Math.max(0, (state.resQPage || 0) + delta); renderResults(); }
+    function resResultPage(delta) { state.resRPage = Math.max(0, (state.resRPage || 0) + delta); renderResults(); }
+
+    /* ===== Simulation (เดินทีละ step 1→6 ในหน้าเดียว) ===== */
+    function pickSimQuiz_() {
+      const all = (state.data.questions || []).filter((q) => String(q.active).toLowerCase() !== 'false' && q.question);
+      const pool = all.slice();
+      for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = pool[i]; pool[i] = pool[j]; pool[j] = t; }
+      const picked = pool.slice(0, 3).map((q) => ({ question: q.question, choices: splitPipe(q.choices), correct: Number(q.correct) || 0, explain: q.explain || '' }));
+      if (picked.length) return picked;
+      return [
+        { question: 'ได้รับอีเมลให้กดลิงก์ยืนยันบัญชีด่วนภายใน 24 ชม. ควรทำอย่างไร?', choices: ['กดลิงก์ทันที', 'หยุด แล้วเข้าเว็บทางการเองเพื่อตรวจสอบ', 'ตอบกลับอีเมลถามรหัสผ่าน'], correct: 2, explain: 'อย่ากดลิงก์ในอีเมล ให้พิมพ์เว็บทางการเองและตรวจสอบก่อนเสมอ' },
+        { question: 'สัญญาณข้อใด "น่าสงสัย" ว่าเป็นฟิชชิง?', choices: ['อีเมลจากเพื่อนร่วมงานเรื่องประชุม', 'เร่งรัด/ขู่ว่าบัญชีจะถูกระงับ + ลิงก์แปลก', 'จดหมายข่าวที่สมัครเอง'], correct: 2, explain: 'การสร้างความเร่งด่วน + ลิงก์/โดเมนแปลก เป็นสัญญาณคลาสสิกของฟิชชิง' },
+        { question: 'ถ้าสงสัยว่าได้อีเมลหลอก ควรทำอะไรเป็นอันดับแรก?', choices: ['ลบทิ้งเงียบ ๆ', 'หยุด-ตรวจสอบ-รายงาน IT', 'กดลิงก์ดูว่าใช่จริงไหม'], correct: 2, explain: 'จำง่าย ๆ: หยุด → ตรวจสอบ → รายงาน IT/หัวหน้า' }
+      ];
+    }
+
+    function simEmailHtml_(ctaOnclick) {
+      return `
+        <div class="ol">
+          <div class="ol-bar"><span class="ol-btn">↩ ตอบกลับ</span><span class="ol-btn">↪ ส่งต่อ</span><span class="ol-btn">🗑 ลบ</span><span style="margin-left:auto;opacity:.85;">มุมมองจำลอง (Outlook)</span></div>
+          <div class="ol-subject">[ด่วนที่สุด] บัญชีของคุณจะถูกระงับภายใน 24 ชั่วโมง</div>
+          <div class="ol-meta">
+            <div class="ol-ava">ฝ</div>
+            <div>
+              <div class="ol-from"><b>ฝ่ายความปลอดภัยบัญชี</b> &lt;security-alert@scb-secure-login.com&gt;</div>
+              <div class="ol-to">ถึง: คุณ</div>
+            </div>
+          </div>
+          <div class="ol-warn">⚠ นี่คือ <b>การจำลอง</b>เพื่อฝึกเท่านั้น — ปุ่มในเมลไม่ได้พาไปไหนจริง</div>
+          <div class="ol-body">
+            <p>เรียนผู้ใช้งาน</p>
+            <p>ระบบตรวจพบกิจกรรมผิดปกติในบัญชีของคุณ กรุณายืนยันตัวตนภายใน <b>24 ชั่วโมง</b> มิฉะนั้นบัญชีจะถูกระงับถาวร</p>
+            <p style="text-align:center; margin:18px 0;">
+              <a href="javascript:void(0)" ${ctaOnclick ? `onclick="${ctaOnclick}"` : ''} style="display:inline-block; background:#2f8f5b; color:#fff; padding:12px 26px; border-radius:6px; text-decoration:none; font-weight:700;">ยืนยันบัญชีทันที</a>
+            </p>
+            <p style="font-size:12px; color:#999;">หากไม่ดำเนินการ บัญชีจะถูกล็อกโดยอัตโนมัติ</p>
+          </div>
+        </div>`;
+    }
+
+    function renderSimulation() {
+      if (!state.sim) state.sim = { step: 1, answers: {}, quiz: null, score: 0, loadError: '' };
+      const s = state.sim;
+      const hasQuiz = Array.isArray(s.quiz) && s.quiz.length;
+
+      const card = (n, title, bodyActive, doneText) => {
+        const status = s.step > n ? 'done' : (s.step === n ? 'active' : 'locked');
+        const dot = status === 'done' ? '✓' : n;
+        const dotBg = status === 'locked' ? '#e7efe9' : '#2f8f5b';
+        const dotFg = status === 'locked' ? '#9aa' : '#fff';
+        return `
+          <div class="section" style="${status === 'locked' ? 'opacity:.55;' : ''}">
+            <div class="section-title" style="display:flex;align-items:center;gap:10px;">
+              <span style="flex:none;width:30px;height:30px;border-radius:50%;background:${dotBg};color:${dotFg};display:inline-flex;align-items:center;justify-content:center;font-weight:700;">${dot}</span>
+              ${escapeHtml(title)}
+            </div>
+            ${status === 'active' ? `<div class="section-body">${bodyActive}</div>`
+              : status === 'done' ? `<div class="section-body"><p class="muted">✓ ${escapeHtml(doneText || 'เสร็จแล้ว')}</p></div>` : ''}
+          </div>`;
+      };
+
+      const quizItems = !hasQuiz ? '<p class="muted">กำลังโหลดคำถามจากระบบ (getTrainingQuiz)…</p>'
+        : s.quiz.map((q, qi) => `
+        <div class="quiz-item">
+          <p><b>ข้อ ${qi + 1}.</b> ${escapeHtml(q.question)}</p>
+          <div class="quiz" id="simquiz_${qi}">
+            ${q.choices.map((c, i) => `<button type="button" id="sq${qi}_c${i + 1}" onclick="simPickAnswer(${qi}, ${i + 1})">${escapeHtml(c)}</button>`).join('')}
+          </div>
+          <div class="qfb" id="simfb_${qi}"></div>
+        </div>`).join('');
+
+      const step1 = `
+        <p>จำลองการส่งอีเมลฟิชชิงไปยังพนักงาน (สาธิต — ไม่ส่งอีเมลจริง แต่เรียกฟังก์ชันจริงเพื่อทดสอบโค้ด + เขียน log)</p>
+        <button class="btn" onclick="simStep1Send()">📧 ส่งอีเมลฟิชชิงจำลอง</button>`;
+      const step2 = `
+        <p class="muted">อ่านอีเมลนี้เหมือนที่เห็นในกล่องจดหมาย Outlook</p>
+        ${simEmailHtml_('')}
+        <div class="actions" style="margin-top:10px;"><button class="btn" onclick="simReadDone()">อ่านแล้ว ต่อไป →</button></div>`;
+      const step3 = `
+        <p>ในอีเมลมีปุ่มชวนให้กด — <b>ลองกดปุ่ม "ยืนยันบัญชีทันที"</b> ในอีเมลด้านล่าง</p>
+        ${simEmailHtml_('simClickLink()')}`;
+      const step4 = `
+        <div class="message error">🛑 คุณเพิ่งกดลิงก์ในอีเมลหลอก! ถ้าเป็นของจริง ลิงก์นี้จะพาไป<b>หน้าปลอม</b>เพื่อขโมยรหัสผ่าน/ข้อมูลของคุณ</div>
+        <h3>เราทำอะไรไป?</h3>
+        <p>ระบบส่งอีเมลฟิชชิงจำลอง → คุณอ่าน → แล้วกดลิงก์ในอีเมล เพื่อให้เห็นว่ามิจฉาชีพหลอกได้ง่ายแค่ไหน</p>
+        <h3>คุณต้องทำอะไรต่อ?</h3>
+        <p>อ่านวิธีสังเกต/ป้องกันสั้น ๆ ด้านล่าง แล้วทำแบบทดสอบ 3 ข้อให้ผ่าน</p>
+        <h3>🚩 ฟิชชิงต้องระวังอะไร</h3>
+        <ul>
+          <li>เร่งรัด/ขู่ว่าจะเสียประโยชน์ เช่น "บัญชีจะถูกระงับใน 24 ชม."</li>
+          <li>โดเมนผู้ส่งแปลก (เช่น scb-secure-login.com ไม่ใช่ scb.co.th)</li>
+          <li>ขอรหัสผ่าน OTP/MFA หรือให้กดลิงก์/เปิดไฟล์แนบ</li>
+        </ul>
+        <p>✅ จำง่าย ๆ: <b>หยุด → ตรวจสอบ (พิมพ์เว็บเอง/โทรหาต้นทาง) → รายงาน IT</b></p>
+        <div class="actions"><button class="btn" onclick="simToQuiz()">เริ่มทำแบบทดสอบ →</button></div>`;
+      const step5 = `
+        <p class="muted">คำถามดึงจากคลังจริงผ่าน getTrainingQuiz · ตอบถูกครบทุกข้อจึงจะผ่าน</p>
+        ${s.loadError ? `<div class="message error">โหลดคำถามจากระบบไม่ได้: ${escapeHtml(s.loadError)} — ใช้ชุดสำรองแทน</div>` : ''}
+        ${quizItems}
+        ${hasQuiz ? '<div class="actions"><button class="btn" id="simSubmit" onclick="simSubmit()">ส่งคำตอบ</button></div>' : ''}
+        <div id="simQuizResult"></div>`;
+      const step6 = `
+        <div class="message">🎉 จบการจำลอง! คุณตอบถูก <b>${s.score}/${s.quiz.length}</b> ข้อ — <b>ผ่าน</b></div>
+        <p><b>สรุปสิ่งที่เกิดขึ้น:</b> ส่งเมลจำลอง → อ่านเมล → กดลิงก์ (โดนหลอก) → เรียนรู้วิธีระวัง → ทำแบบทดสอบผ่าน</p>
+        <p class="muted">ถ้าเจอแบบนี้ของจริง อย่ากดลิงก์ ให้ตรวจสอบกับต้นทางและรายงาน IT เสมอ</p>
+        <div class="actions"><button class="btn secondary" onclick="simRestart()">↺ เริ่มจำลองใหม่</button></div>`;
+
+      document.getElementById('Simulation').innerHTML = `
+        <div class="section"><div class="section-title">🎬 Simulation — จำลองการโดนฟิชชิงแบบครบขั้นตอน</div>
+          <div class="section-body"><p class="muted">เดินทีละขั้นจากบนลงล่าง เพื่อเห็นภาพว่าฟิชชิงเกิดขึ้นอย่างไรและต้องรับมืออย่างไร</p></div>
+        </div>
+        ${card(1, 'ส่งอีเมลฟิชชิงจำลอง', step1, 'ส่งอีเมลจำลองแล้ว')}
+        ${card(2, 'อ่านอีเมล (มุมมอง Outlook)', step2, 'อ่านอีเมลแล้ว')}
+        ${card(3, 'กดลิงก์ในอีเมล', step3, 'กดลิงก์แล้ว')}
+        ${card(4, 'หน้าอบรม — เกิดอะไรขึ้น & ต้องระวังอะไร', step4, 'อ่านวิธีระวังแล้ว')}
+        ${card(5, 'ตอบคำถามให้ผ่าน 3 ข้อ', step5, 'ทำแบบทดสอบผ่านแล้ว')}
+        ${card(6, 'รายงานผล', step6, '')}
+      `;
+    }
+
+    // ตัวตนของการจำลอง — แยกชัดเจนจากข้อมูลจริง (กรอง/ลบได้ใน Results/Logs)
+    const SIM_ID = { email: 'sim@simulation.local', name: 'SIMULATION (ทดสอบระบบ)', topic: 'Simulation' };
+    function simCid_() { return (state.data.user && state.data.user.customer_id) || ''; }
+    // เขียน log การทดสอบลงชีต Logs (เรียก backend จริง) — ไว้เป็น trail สำหรับตรวจ error
+    function logSim_(msg) {
+      try { google.script.run.withFailureHandler(function () {}).logClientAction('SIMULATION', 'OK', msg); } catch (e) {}
+    }
+    function simScroll_() { const el = document.getElementById('Simulation'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+
+    function simNext(n) {
+      state.sim.step = Math.max(state.sim.step, n);
+      renderSimulation();
+      simScroll_();
+      if (n === 5 && !(state.sim.quiz && state.sim.quiz.length)) simLoadQuiz_();
+    }
+    function simStep1Send() {
+      logSim_('1: ส่งอีเมลฟิชชิงจำลอง (ไม่ส่งจริง) + ทดสอบ path โควต้า');
+      google.script.run
+        .withSuccessHandler(function () {})
+        .withFailureHandler(function (err) { logSim_('1 ERROR getGoogleMailQuota: ' + ((err && err.message) || err)); })
+        .getGoogleMailQuota();
+      simNext(2);
+    }
+    function simReadDone() { logSim_('2: อ่านอีเมลจำลอง'); simNext(3); }
+    function simToQuiz() { logSim_('4: หน้าอบรม → ไปแบบทดสอบ'); simNext(5); }
+    function simLoadQuiz_() {
+      logSim_('5: โหลดคำถามจาก getTrainingQuiz');
+      google.script.run
+        .withSuccessHandler(function (list) {
+          state.sim.loadError = '';
+          state.sim.quiz = (Array.isArray(list) && list.length)
+            ? list.map(function (x) { return { question: x.question, choices: x.choices || [], correct: Number(x.correct) || 0, explain: x.explain || '' }; })
+            : pickSimQuiz_();
+          renderSimulation(); simScroll_();
+        })
+        .withFailureHandler(function (err) {
+          state.sim.loadError = (err && err.message) || String(err);
+          logSim_('5 ERROR getTrainingQuiz: ' + state.sim.loadError);
+          state.sim.quiz = pickSimQuiz_();
+          renderSimulation();
+        })
+        .getTrainingQuiz('', simCid_());
+    }
+    function simClickLink() {
+      logSim_('3: กดลิงก์ → recordTrainingAction(clicked)');
+      google.script.run
+        .withSuccessHandler(function () {})
+        .withFailureHandler(function (err) { logSim_('3 ERROR recordTrainingAction(clicked): ' + ((err && err.message) || err)); })
+        .recordTrainingAction({ customer_id: simCid_(), email: SIM_ID.email, name: SIM_ID.name, topic: SIM_ID.topic, action: 'clicked', score: '' });
+      simNext(4);
+    }
+    function simPickAnswer(qi, choice) {
+      state.sim.answers[qi] = choice;
+      const box = document.getElementById('simquiz_' + qi);
+      if (box) Array.from(box.querySelectorAll('button')).forEach((b) => b.classList.remove('sel', 'ok', 'no'));
+      const fb = document.getElementById('simfb_' + qi);
+      if (fb) { fb.textContent = ''; fb.className = 'qfb'; }
+      const btn = document.getElementById('sq' + qi + '_c' + choice);
+      if (btn) btn.classList.add('sel');
+    }
+    function simSubmit() {
+      const s = state.sim;
+      const quiz = s.quiz || [];
+      if (!quiz.length) return;
+      if (Object.keys(s.answers).length < quiz.length) { setMsg('simQuizResult', 'กรุณาตอบให้ครบทุกข้อ', true); return; }
+      let correct = 0;
+      quiz.forEach((q, qi) => {
+        const ans = Number(s.answers[qi]);
+        const ok = Number(q.correct) === ans;
+        if (ok) correct++;
+        const fb = document.getElementById('simfb_' + qi);
+        if (fb) { fb.className = 'qfb ' + (ok ? 'ok' : 'no'); fb.textContent = (ok ? '✔ ถูกต้อง — ' : '✘ ลองทบทวน — ') + (q.explain || ''); }
+        const chosen = document.getElementById('sq' + qi + '_c' + ans);
+        if (chosen) chosen.classList.add(ok ? 'ok' : 'no');
+        if (!ok) { const right = document.getElementById('sq' + qi + '_c' + Number(q.correct)); if (right) right.classList.add('ok'); }
+      });
+      s.score = correct;
+      const passed = correct === quiz.length;
+      logSim_('5: ส่งคำตอบ ' + correct + '/' + quiz.length + (passed ? ' PASS' : ' RETRY'));
+      if (passed) {
+        google.script.run
+          .withSuccessHandler(function () {})
+          .withFailureHandler(function (err) { logSim_('5 ERROR recordTrainingAction(passed): ' + ((err && err.message) || err)); })
+          .recordTrainingAction({ customer_id: simCid_(), email: SIM_ID.email, name: SIM_ID.name, topic: SIM_ID.topic, action: 'passed', score: correct });
+        logSim_('6: รายงานผล (ผ่าน ' + correct + '/' + quiz.length + ')');
+        simNext(6);
+      } else {
+        setMsg('simQuizResult', `ตอบถูก ${correct}/${quiz.length} ข้อ — ต้องถูกครบทุกข้อจึงจะผ่าน ทบทวนคำอธิบายแล้วลองใหม่`, true);
+      }
+    }
+    function simRestart() { state.sim = { step: 1, answers: {}, quiz: null, score: 0, loadError: '' }; logSim_('restart การจำลอง'); renderSimulation(); }
 
     function renderReport() {
       document.getElementById('Report').innerHTML = `
@@ -1038,12 +1322,6 @@
 
     function drawReport(d) {
       state.report = d;
-      const f = d.funnel;
-      const q = d.quota || {};
-      const groupRows = (d.groups || []).map((g) => {
-        const rate = g.attempts ? Math.round(g.passed / g.attempts * 100) : 0;
-        return `<tr><td>${escapeHtml(g.label)}</td><td style="text-align:center;">${g.attempts}</td><td style="text-align:center;">${g.passed}</td><td style="text-align:center;">${rate}%</td></tr>`;
-      }).join('');
       const peopleRows = (d.people || []).map((p) => `
         <tr>
           <td>${escapeHtml(p.email || '')}</td>
@@ -1060,28 +1338,7 @@
           <button class="btn" onclick="window.print()">พิมพ์ / บันทึก PDF</button>
         </div>
         <div class="section">
-          <div class="section-title">สรุปผลแคมเปญ — ${escapeHtml(d.org || '')}</div>
-          <div class="section-body">
-            <div class="stats">
-              ${statHtml('เป้าหมาย', f.targets)}
-              ${statHtml('ส่งคิว', f.sent)}
-              ${statHtml('คลิก', f.clicked)}
-              ${statHtml('อบรม', f.trained)}
-              ${statHtml('ผ่าน', f.passed)}
-              ${statHtml('อัตราผ่าน %', f.passRate)}
-            </div>
-            <p class="muted">อัตราคลิก ${f.clickRate}% · ผ่านในกลุ่มที่อบรม ${f.passOfTrained}%</p>
-          </div>
-        </div>
-        <div class="section">
-          <div class="section-title">ผลแยกตามกลุ่มหัวข้อ</div>
-          <div class="section-body"><div class="table-wrap"><table>
-            <thead><tr><th>กลุ่ม</th><th>จำนวนที่อบรม</th><th>ผ่าน</th><th>อัตราผ่าน</th></tr></thead>
-            <tbody>${groupRows || '<tr><td colspan="4" class="muted">ยังไม่มีข้อมูล</td></tr>'}</tbody>
-          </table></div></div>
-        </div>
-        <div class="section">
-          <div class="section-title">รายคน (${(d.people || []).length})</div>
+          <div class="section-title">รายชื่อผู้เข้าอบรม — ${escapeHtml(d.org || '')} (${(d.people || []).length})</div>
           <div class="section-body"><div class="table-wrap"><table>
             <thead><tr><th>อีเมล</th><th>ชื่อ</th><th>แผนก</th><th>คลิก</th><th>อบรม</th><th>ผ่าน</th><th>คะแนน</th></tr></thead>
             <tbody>${peopleRows || '<tr><td colspan="7" class="muted">ยังไม่มีรายชื่อ</td></tr>'}</tbody>
@@ -1400,7 +1657,14 @@
           state.data.dashboard = res.dashboard;
           renderEmailList();
           renderResults();
-          setMsg('emailMsg', `Added ${res.added}. Rejected ${res.rejected.length}.`, false);
+          const rej = res.rejected || [];
+          const dups = rej.filter((r) => r.reason === 'duplicate').map((r) => r.email);
+          const others = rej.filter((r) => r.reason !== 'duplicate');
+          const fmt = (arr) => arr.length > 10 ? arr.slice(0, 10).join(', ') + ` …(+${arr.length - 10})` : arr.join(', ');
+          let msg = `เพิ่มแล้ว ${res.added} รายการ`;
+          if (dups.length) msg += ` · ⚠ ซ้ำ ${dups.length}: ${fmt(dups)}`;
+          if (others.length) msg += ` · ตกหล่น ${others.length} (${fmt(others.map((r) => r.email + ':' + r.reason))})`;
+          setMsg('emailMsg', msg, dups.length > 0 || others.length > 0);
         })
         .withFailureHandler((err) => setMsg('emailMsg', err.message || String(err), true))
         .addEmailTargets({ text });
@@ -1580,6 +1844,10 @@
           <div class="section-body">
             <h1>หยุด • ตรวจสอบ • รายงาน</h1>
             <p>หน้านี้สำหรับการอบรมความตระหนักรู้ภายในเท่านั้น — ไม่มีการขอรหัสผ่านหรือเก็บข้อมูลใด ๆ</p>
+            <div class="message">
+              <label for="trainName"><b>กรอกชื่อ-นามสกุลของคุณ</b> (เพื่อบันทึกว่าคุณทำแบบทดสอบนี้แล้ว)</label>
+              <input id="trainName" placeholder="เช่น สมชาย ใจดี" value="${escapeAttr(params.get('name') || params.get('e') || '')}" style="margin-top:6px;">
+            </div>
             ${tipHtml}
 
             <h3>📧 ตัวอย่างเมลหลอก — ลองดูแบบที่เห็นใน Outlook</h3>
@@ -1672,6 +1940,13 @@
 
     function submitQuiz() {
       const quiz = state.quiz || [];
+      const nameEl = document.getElementById('trainName');
+      const name = nameEl ? nameEl.value.trim() : '';
+      if (!name) {
+        setMsg('quizResult', 'กรุณากรอกชื่อ-นามสกุลของคุณก่อนส่งคำตอบ', true);
+        if (nameEl) nameEl.focus();
+        return;
+      }
       if (Object.keys(state.answers).length < quiz.length) {
         setMsg('quizResult', 'กรุณาตอบให้ครบทุกข้อ', true);
         return;
@@ -1702,6 +1977,7 @@
       google.script.run.recordTrainingAction({
         customer_id: params.get('cid') || params.get('c') || '',
         email: params.get('e') || '',
+        name: name,
         topic: params.get('g') || params.get('t') || (quiz[0] && quiz[0].group) || 'Training Page',
         action: passed ? 'passed' : 'trained',
         score: correctCount
@@ -1870,7 +2146,15 @@
       state.data.questionGroups = res.questionGroups;
       renderTrainingPanel();
     }
+    function onGroupSelChange() {
+      const sel = document.getElementById('nqGroupSel');
+      const inp = document.getElementById('nqGroupNew');
+      if (sel && inp) { inp.style.display = (sel.value === '__new__') ? '' : 'none'; if (sel.value === '__new__') inp.focus(); }
+    }
     function addQuestion() {
+      const sel = document.getElementById('nqGroupSel');
+      const group = (sel && sel.value === '__new__') ? (val('nqGroupNew') || '').trim() : (sel ? sel.value : '');
+      if (!group) { setMsg('qMsg', 'เลือกกลุ่ม หรือพิมพ์ชื่อกลุ่มใหม่ก่อน', true); return; }
       const question = val('nqQuestion');
       if (!question) { setMsg('qMsg', 'พิมพ์คำถามก่อน', true); return; }
       const rows = Array.from(document.querySelectorAll('#choiceBox .choice-row'));
@@ -1884,7 +2168,7 @@
       });
       if (choices.length < 2) { setMsg('qMsg', 'ใส่ตัวเลือกอย่างน้อย 2 ข้อ', true); return; }
       if (!correct) { setMsg('qMsg', 'คลิกวงกลมหน้าข้อที่ถูกก่อน', true); return; }
-      const data = { group: state.qForm.group, question, choices: choices.join('|'), correct, explain: val('nqExplain') };
+      const data = { group: group, question, choices: choices.join('|'), correct, explain: val('nqExplain') };
       callServer('addQuestionRow', data, (res) => { state.qForm.choices = 2; applyQuestions(res); }, 'qMsg');
     }
     function openLink(btn) {

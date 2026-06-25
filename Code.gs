@@ -4,23 +4,23 @@
 // ╚══════════════════════════════════════════════════════════════════════════╝
 const CONFIG = {
   // ผู้พัฒนา (ผู้เขียนซอฟต์แวร์) — แสดงเครดิต "พัฒนาโดย" เสมอ + เป็น admin เสมอ ไม่ว่าติดตั้งบนบัญชีใด
-  developerEmail: 'sunart.srisumal@gmail.com',
+  developerEmail: 'monggame29@gmail.com',
   // admin เพิ่มเติม — เจ้าของชีต (บัญชีที่ติดตั้ง) เป็น admin อัตโนมัติอยู่แล้ว ปล่อย [] ได้
   adminEmails: [],
 
   // ID ชีตฐานข้อมูล — ใช้เป็น fallback เมื่อ getActiveSpreadsheet() คืน null
-  // ติดตั้งใหม่: ใส่ ID ชีตของตัวเอง
-  spreadsheetId: '1tEp9CSHtWZhaSSfh5lDf5mkfT1L5WI7YFiYfsdN-mtM',
+  // ปล่อย '' ได้เมื่อสคริปต์ผูกกับชีต (getActiveSpreadsheet ใช้งานได้) — ใส่ ID ชีตของตัวเองถ้าต้องการ fallback
+  spreadsheetId: '',
 
   // URL /exec ของ deployment แอด admin — ปล่อย '' ได้ ระบบ auto-detect จาก ScriptApp.getService().getUrl()
-  webAppUrl: 'https://script.google.com/macros/s/AKfycbzdPMQHI0NEGys7MhMFbJWEZbWc41M99wllvzDT76Q8rv-enPYVCd9KL7jhV5fRLkPD/exec',
+  webAppUrl: '',
 
   // URL /exec ของ deployment training แบบ "ทุกคน/ไม่ต้องล็อกอิน" (Execute as Me + Anyone)
   // ปล่อย '' = ใช้ webAppUrl แทน (แต่จะกลายเป็นต้องล็อกอิน) — ดู [[anonymous-training-deployment]]
-  trainingWebAppUrl: 'https://script.google.com/macros/s/AKfycbzr9C0vwwFfJ7sJI0SSzfwND1U9tTLrkw6TuTUyM6hoc_rgCRkawKykD5As52jglZw/exec',
+  trainingWebAppUrl: '',
 
   // seed ข้อมูลสาธิต (ลูกค้า SUNART/TFP + อีเมล/ผลตัวอย่าง) — ติดตั้งใช้งานจริงให้ตั้ง false เพื่อ DB สะอาด
-  seedDemo: true
+  seedDemo: false
 };
 
 const APP = {
@@ -39,7 +39,7 @@ const APP = {
 const SPREADSHEET_ID = CONFIG.spreadsheetId;
 
 // เพิ่มเลขนี้ทุกครั้งที่แก้ HEADERS/seed เพื่อบังคับ setupDatabase รันใหม่ 1 ครั้งหลัง deploy
-const SCHEMA_VERSION = 13;
+const SCHEMA_VERSION = 14;
 
 // กลุ่มคำถามอบรม (5 กลุ่ม) — code ใช้ในชีต Questions, label แสดงผลภาษาไทย
 const QUESTION_GROUPS = [
@@ -81,7 +81,7 @@ const HEADERS = {
   Schedule: ['customer_id', 'date', 'count', 'status', 'created_at', 'emails'],
   OldTopics: ['topic', 'context', 'category', 'active', 'created_at', 'archived_at'],
   Queue: ['customer_id', 'email', 'topic', 'send_date', 'status', 'retry_count', 'last_error'],
-  Results: ['customer_id', 'email', 'action', 'action_time', 'topic', 'score'],
+  Results: ['customer_id', 'email', 'action', 'action_time', 'topic', 'score', 'name'],
   Reports: ['timestamp', 'customer_id', 'report_type', 'summary'],
   Settings: ['key', 'value', 'description'],
   Logs: ['timestamp', 'customer_id', 'user_email', 'role', 'action', 'result', 'error_message']
@@ -263,10 +263,25 @@ function manageableQuestions_(user) {
 function questionGroupCounts_(user) {
   // admin เห็น/นับทุกคำถามในระบบ · customer เห็นเฉพาะคลังกลาง + ของหน่วยงานตัวเอง
   const pool = user.role === 'admin' ? rows_(SHEETS.questions) : questionsForOrg_(user.customer_id);
-  return QUESTION_GROUPS.map(function (g) {
-    const n = pool.filter(function (r) { return String(r.group).toLowerCase().trim() === g.code; }).length;
-    return { code: g.code, label: g.label, count: n };
+  const countOf = function (code) {
+    return pool.filter(function (r) { return String(r.group).toLowerCase().trim() === code; }).length;
+  };
+  const out = [];
+  const seen = {};
+  // 5 กลุ่มมาตรฐาน (แสดงเสมอ แม้ count = 0)
+  QUESTION_GROUPS.forEach(function (g) {
+    seen[g.code] = true;
+    out.push({ code: g.code, label: g.label, count: countOf(g.code) });
   });
+  // กลุ่มที่ผู้ใช้เพิ่มเอง (code = label = ชื่อที่พิมพ์)
+  pool.forEach(function (r) {
+    const code = String(r.group || '').toLowerCase().trim();
+    if (code && !seen[code]) {
+      seen[code] = true;
+      out.push({ code: code, label: code, count: countOf(code) });
+    }
+  });
+  return out;
 }
 
 function listQuestions() {
@@ -314,9 +329,10 @@ function assertSafeContent_(text) {
 
 // ตรวจ + ทำให้เป็นมาตรฐาน 1 คำถาม (ใช้ทั้ง add และ import) — คืน array แถวพร้อมเขียน หรือ throw
 function normalizeQuestion_(item, ownerId, source) {
-  const groupCodes = QUESTION_GROUPS.map(function (g) { return g.code; });
+  // กลุ่ม: รับได้ทั้ง 5 กลุ่มมาตรฐาน และกลุ่มที่ผู้ใช้เพิ่มเอง (ตรวจความปลอดภัยกันสคริปต์/ลิงก์)
   const group = String(item && item.group || '').toLowerCase().trim();
-  if (groupCodes.indexOf(group) === -1) throw new Error('กลุ่มไม่ถูกต้อง: ' + group);
+  if (!group) throw new Error('กรุณาเลือกหรือใส่กลุ่ม');
+  assertSafeContent_(group);
   const question = String(item && item.question || '').trim();
   if (!question) throw new Error('คำถามว่าง');
   const choices = splitChoices_(item && item.choices);
@@ -484,7 +500,6 @@ function getReportData() {
   requireCustomer_(user);
   const targets = scopeRows_(rows_(SHEETS.emailList), 'customer_id', user);
   const results = scopeRows_(rows_(SHEETS.results), 'customer_id', user);
-  const queue = scopeRows_(rows_(SHEETS.queue), 'customer_id', user);
 
   // รวมผลต่ออีเมล
   const byEmail = {};
@@ -509,37 +524,8 @@ function getReportData() {
     };
   });
 
-  const totalTargets = people.length;
-  const clicked = people.filter(function (p) { return p.clicked; }).length;
-  const trained = people.filter(function (p) { return p.trained; }).length;
-  const passed = people.filter(function (p) { return p.passed; }).length;
-
-  // แยกตามกลุ่ม (Results.topic = group code ที่บันทึกจากหน้า quiz)
-  const groups = {};
-  QUESTION_GROUPS.forEach(function (g) { groups[g.code] = { code: g.code, label: g.label, attempts: 0, passed: 0 }; });
-  results.forEach(function (r) {
-    const g = String(r.topic || '').toLowerCase().trim();
-    const a = String(r.action || '').toLowerCase();
-    if (groups[g] && (a === 'trained' || a === 'passed')) {
-      groups[g].attempts++;
-      if (a === 'passed') groups[g].passed++;
-    }
-  });
-
   return jsonSafe_({
-    funnel: {
-      targets: totalTargets,
-      sent: queue.length,
-      clicked: clicked,
-      trained: trained,
-      passed: passed,
-      passRate: totalTargets ? Math.round(passed / totalTargets * 100) : 0,
-      passOfTrained: trained ? Math.round(passed / trained * 100) : 0,
-      clickRate: totalTargets ? Math.round(clicked / totalTargets * 100) : 0
-    },
     people: people,
-    groups: QUESTION_GROUPS.map(function (g) { return groups[g.code]; }),
-    quota: computeQuota_(user),
     org: user.customer_id || 'ALL',
     generatedBy: user.email
   });
@@ -548,8 +534,20 @@ function getReportData() {
 function listLogs(limit) {
   setupDatabase();
   const user = getCurrentUser_();
-  const logs = scopeRows_(rows_(SHEETS.logs), 'customer_id', user);
-  return logs.slice(Math.max(logs.length - (limit || 100), 0)).reverse();
+  // Perf: อ่านเฉพาะ N แถวท้ายของชีต Logs (ไม่อ่านทั้งใบ) — Logs โตทุกการเรียก server จึงห้ามอ่านหมด
+  const sheet = sheet_(SHEETS.logs);
+  const lastRow = sheet.getLastRow();
+  const n = Math.min(limit || 100, Math.max(0, lastRow - 1));
+  if (n <= 0) return [];
+  const headers = HEADERS.Logs;
+  const values = sheet.getRange(lastRow - n + 1, 1, n, headers.length).getValues();
+  const out = values.map(function (row) {
+    const o = {};
+    headers.forEach(function (h, i) { o[h] = row[i]; });
+    return o;
+  });
+  // admin (single-tenant) เห็นทุกแถว · ใหม่สุดอยู่บน
+  return scopeRows_(out, 'customer_id', user).reverse();
 }
 
 function getSettings() {
@@ -725,6 +723,17 @@ function createRandomQueue(payload) {
 function todayStr_() { return dateStr_(new Date()); }
 function dateStr_(d) { return Utilities.formatDate(new Date(d), Session.getScriptTimeZone(), 'yyyy-MM-dd'); }
 
+// แปลงค่าวันจากชีตให้เป็น 'yyyy-MM-dd' เสมอ — Sheets แปลง string 'YYYY-MM-DD' ที่ appendRow ให้กลายเป็น
+// Date object เอง พอ rows_ อ่านกลับมา String(date) จะได้รูปยาวที่ไม่ตรง key ปฏิทิน ทำให้ badge/upsert/trigger พัง
+function dateKey_(v) {
+  if (v instanceof Date) return dateStr_(v);
+  const s = String(v == null ? '' : v).trim();
+  const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2);
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? s : dateStr_(d);
+}
+
 // ปฏิทินของหน่วยงานผู้ใช้ + สถานะ trigger (สำหรับ admin)
 // สร้างเนื้อหาเมลจำลอง (ใช้ร่วมทั้ง preview และ send จริง) — ผู้ส่งที่แสดงเป็นชื่อ "ลวง"
 // เพื่อความสมจริงในหน้าจำลองเท่านั้น (ตอนส่งจริงผู้ส่งคือบัญชีระบบ ไม่ปลอม)
@@ -790,7 +799,7 @@ function getSchedule() {
     .filter(function (r) { return String(r.customer_id) === user.customer_id; })
     .map(function (r) {
       return {
-        date: String(r.date),
+        date: dateKey_(r.date),
         count: Number(r.count) || 0,
         status: String(r.status || ''),
         emails: String(r.emails || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean)
@@ -826,7 +835,7 @@ function setScheduleDay(payload) {
   const emi = headers.indexOf('emails');
   let foundRow = -1;
   for (let i = 1; i < values.length; i++) {
-    if (String(values[i][ci]) === user.customer_id && String(values[i][di]) === date) { foundRow = i + 1; break; }
+    if (String(values[i][ci]) === user.customer_id && dateKey_(values[i][di]) === date) { foundRow = i + 1; break; }
   }
   if (count <= 0) {
     if (foundRow > 0) sheet.deleteRow(foundRow);
@@ -855,7 +864,7 @@ function runDailySchedule() {
   const emi = headers.indexOf('emails');
   let done = 0;
   for (let i = 1; i < values.length; i++) {
-    if (String(values[i][di]) !== today) continue;
+    if (dateKey_(values[i][di]) !== today) continue;
     if (String(values[i][st]).toLowerCase() === 'done') continue;
     const emailsList = emi >= 0
       ? String(values[i][emi] || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean)
@@ -1180,8 +1189,9 @@ function recordTrainingAction(payload) {
   const customerId = payload && payload.customer_id ? String(payload.customer_id) : '';
   const topic = payload && payload.topic ? String(payload.topic) : 'Training Page';
   const score = payload && payload.score !== undefined ? Number(payload.score) : '';
+  const name = payload && payload.name ? String(payload.name).trim() : '';
 
-  sheet_(SHEETS.results).appendRow([customerId, email, action, new Date(), topic, score]);
+  sheet_(SHEETS.results).appendRow([customerId, email, action, new Date(), topic, score, name]);
   logAction_('RECORD_TRAINING_ACTION', 'OK', action);
   return { ok: true };
 }
