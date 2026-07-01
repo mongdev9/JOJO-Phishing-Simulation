@@ -693,6 +693,17 @@
         : '<span class="muted">ยังไม่มีหัวข้อที่เปิดใช้งาน — ไปเปิดที่หน้า Topics ก่อน</span>';
       const max = Math.max(q.available, 0);
       const queuedCount = (state.data.queue || []).filter((r) => String(r.status).toLowerCase() === 'queued').length;
+      // แบบกำหนดเอง: dropdown หัวข้อ + ติ๊กรายชื่อเป้าหมาย active เอง
+      const activeTargets = (state.data.emailList || []).filter((r) => String(r.status).toLowerCase() === 'active');
+      const topicOptions = activeTopics.length
+        ? activeTopics.map((t) => `<option value="${escapeAttr(t.topic || '')}">${escapeHtml(t.topic || '(ไม่มีชื่อ)')} — ${escapeHtml(t.category || '-')}</option>`).join('')
+        : '';
+      const targetChecks = activeTargets.length
+        ? activeTargets.map((r) => `<label class="topic-check">
+              <input type="checkbox" class="campaign-target" value="${escapeAttr(r.email || '')}">
+              ${escapeHtml(r.email || '')} <span class="muted">${escapeHtml(r.fullname || '')}${r.department ? ' · ' + escapeHtml(r.department) : ''}</span>
+            </label>`).join('')
+        : '<span class="muted">ยังไม่มีรายชื่อเป้าหมาย active — ไปเพิ่มที่หน้า Email List ก่อน</span>';
       document.getElementById('Send Mail').innerHTML = `
         <div class="stats">
           ${statHtml('Send Today', q.available)}
@@ -721,6 +732,26 @@
               <button class="btn" onclick="createQueue()" ${max > 0 ? '' : 'disabled'}>สร้างคิวแคมเปญ</button>
             </div>
             <div id="sendMsg"></div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">สร้างแบบกำหนดเอง (Manual)</div>
+          <div class="section-body">
+            <div class="message">เลือกหัวข้อ 1 หัวข้อ แล้วติ๊กรายชื่อเป้าหมายที่ต้องการเอง (ไม่สุ่ม) · เคารพโควต้าเดียวกัน</div>
+            <label>เลือกหัวข้อ</label>
+            <select id="manualTopic" ${topicOptions ? '' : 'disabled'} style="margin:6px 0 12px;">
+              ${topicOptions || '<option value="">— ยังไม่มีหัวข้อที่เปิดใช้งาน —</option>'}
+            </select>
+            <div class="actions" style="margin-bottom:6px;">
+              <label>เลือกรายชื่อเป้าหมาย</label>
+              <button class="btn secondary" type="button" onclick="toggleAllTargets(true)" ${activeTargets.length ? '' : 'disabled'}>เลือกทั้งหมด</button>
+              <button class="btn secondary" type="button" onclick="toggleAllTargets(false)" ${activeTargets.length ? '' : 'disabled'}>ล้าง</button>
+            </div>
+            <div style="margin:6px 0 12px;max-height:220px;overflow:auto;">${targetChecks}</div>
+            <div class="actions">
+              <button class="btn" onclick="createManualQueue()" ${(topicOptions && activeTargets.length && max > 0) ? '' : 'disabled'}>สร้างคิวแบบกำหนดเอง</button>
+            </div>
+            <div id="manualMsg"></div>
           </div>
         </div>
         <div class="section">
@@ -1716,6 +1747,38 @@
         })
         .withFailureHandler((err) => setMsg('sendMsg', err.message || String(err), true))
         .createRandomQueue({ count, topics });
+    }
+
+    // ติ๊ก/ล้าง รายชื่อเป้าหมายทั้งหมดในโหมดกำหนดเอง
+    function toggleAllTargets(on) {
+      document.querySelectorAll('.campaign-target').forEach((el) => { el.checked = !!on; });
+    }
+
+    // สร้างคิวแบบกำหนดเอง — แอดมินเลือกหัวข้อ + ติ๊กรายชื่อเป้าหมายที่ต้องการเอง (ไม่สุ่ม)
+    function createManualQueue() {
+      const topic = (document.getElementById('manualTopic') || {}).value || '';
+      const emails = Array.from(document.querySelectorAll('.campaign-target:checked')).map((el) => el.value);
+      if (!topic) { setMsg('manualMsg', 'กรุณาเลือกหัวข้อ', true); return; }
+      if (!emails.length) { setMsg('manualMsg', 'กรุณาติ๊กรายชื่อเป้าหมายอย่างน้อย 1 คน', true); return; }
+      setMsg('manualMsg', 'กำลังสร้างคิว...', false);
+      google.script.run
+        .withSuccessHandler((res) => {
+          state.data.queue = res.queue;
+          state.data.dashboard = res.dashboard;
+          if (res.quota) state.data.quota = res.quota;
+          renderSendMail();
+          renderResults();
+          let msg, isErr = false;
+          if (res.blocked) { msg = res.message || 'โควต้าเต็มแล้ว'; isErr = true; }
+          else if (res.noTargets) { msg = 'ไม่พบรายชื่อที่ติ๊กในลิสต์เป้าหมาย active'; isErr = true; }
+          else {
+            msg = `สร้างคิวแล้ว ${res.queued} รายการ`;
+            if (res.clamped) msg += ` (ขอ ${res.requested} แต่โควต้าเหลือเท่านี้)`;
+          }
+          setMsg('manualMsg', msg, isErr);
+        })
+        .withFailureHandler((err) => setMsg('manualMsg', err.message || String(err), true))
+        .createManualQueue({ emails, topic });
     }
 
     // PHASE 2: ส่งคิวจริง — ส่งอีเมลออกจริงไปยังแถวคิวที่ status='queued' (มี confirm กันพลาด)

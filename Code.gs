@@ -745,6 +745,95 @@ function createRandomQueue(payload) {
   });
 }
 
+// สร้างคิวแคมเปญ "แบบกำหนดเอง" — แอดมินเลือกรายชื่อเป้าหมายที่ติ๊กมาเอง + ระบุหัวข้อเอง (ไม่สุ่ม)
+// payload = { emails: ['a@x','b@y', ...], topic: '<ชื่อหัวข้อ>' }
+// คงกฎเดียวกับ createRandomQueue: เคารพโควต้า, ลิงก์จบที่หน้า training, บันทึกเป็น status='queued'
+function createManualQueue(payload) {
+  setupDatabase();
+  const user = getCurrentUser_();
+  requireCustomer_(user);
+
+  const quota = computeQuota_(user);
+  if (quota.available <= 0) {
+    logAction_('CREATE_MANUAL_QUEUE', 'BLOCKED', 'quota_full');
+    return jsonSafe_({
+      queued: 0, requested: 0, clamped: false, blocked: true,
+      message: 'วันนี้เต็มโควต้าแล้ว ลองใหม่พรุ่งนี้',
+      queue: listQueue(), dashboard: getDashboardData(), quota: quota
+    });
+  }
+
+  // รายชื่อที่ส่งมาจาก client (normalize เป็น lowercase, ตัดซ้ำ)
+  const wanted = [];
+  const seen = {};
+  ((payload && payload.emails) || []).forEach(function (e) {
+    const em = String(e || '').toLowerCase().trim();
+    if (em && !seen[em]) { seen[em] = true; wanted.push(em); }
+  });
+  if (!wanted.length) {
+    logAction_('CREATE_MANUAL_QUEUE', 'BLOCKED', 'no_emails');
+    return jsonSafe_({
+      queued: 0, requested: 0, clamped: false, blocked: false, noTargets: true,
+      queue: listQueue(), dashboard: getDashboardData(), quota: quota
+    });
+  }
+
+  // อนุญาตเฉพาะอีเมลที่อยู่ในลิสต์เป้าหมาย active ของหน่วยงานผู้ใช้ (กันฉีดอีเมลนอกลิสต์ + เคารพ scope)
+  const allowed = {};
+  listEmailTargets().forEach(function (row) {
+    if (row.status === 'active') allowed[String(row.email || '').toLowerCase().trim()] = row.email;
+  });
+  const chosen = wanted.filter(function (em) { return allowed[em]; });
+  if (!chosen.length) {
+    logAction_('CREATE_MANUAL_QUEUE', 'BLOCKED', 'no_valid_targets');
+    return jsonSafe_({
+      queued: 0, requested: wanted.length, clamped: false, blocked: false, noTargets: true,
+      queue: listQueue(), dashboard: getDashboardData(), quota: quota
+    });
+  }
+
+  const requested = chosen.length;
+  const count = Math.min(requested, quota.available);
+
+  // หัวข้อเดียวที่แอดมินระบุ (ถ้าไม่ตรง/ว่าง = ใช้ 'Awareness Training')
+  const topicName = String((payload && payload.topic) || '').toLowerCase().trim();
+  const topicRow = topicName
+    ? listTopics().filter(function (t) { return String(t.topic).toLowerCase().trim() === topicName; })[0]
+    : null;
+
+  const sheet = sheet_(SHEETS.queue);
+  const rowsToAdd = [];
+  const now = new Date();
+  chosen.slice(0, count).forEach(function (em) {
+    rowsToAdd.push([
+      user.customer_id,
+      allowed[em],                                             // เก็บอีเมลรูปแบบดั้งเดิมจากลิสต์
+      topicRow ? topicRow.topic : 'Awareness Training',
+      new Date(now.getTime() + randomInt_(5, 180) * 60000),
+      'queued',
+      0,
+      ''
+    ]);
+  });
+
+  if (rowsToAdd.length) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, rowsToAdd.length, HEADERS.Queue.length).setValues(rowsToAdd);
+  }
+
+  const after = computeQuota_(user);
+  logAction_('CREATE_MANUAL_QUEUE', 'OK', 'queued=' + rowsToAdd.length + ', requested=' + requested);
+  return jsonSafe_({
+    queued: rowsToAdd.length,
+    requested: requested,
+    clamped: requested > count,        // ถูกตัดเพราะโควต้าไม่พอ
+    noTargets: false,
+    blocked: false,
+    queue: listQueue(),
+    dashboard: getDashboardData(),
+    quota: after
+  });
+}
+
 /* ===== Schedule (ปฏิทิน) + Google time-trigger ยิงอัตโนมัติรายวัน ===== */
 
 function todayStr_() { return dateStr_(new Date()); }
