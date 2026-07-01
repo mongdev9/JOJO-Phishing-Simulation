@@ -39,7 +39,7 @@ const APP = {
 const SPREADSHEET_ID = CONFIG.spreadsheetId;
 
 // เพิ่มเลขนี้ทุกครั้งที่แก้ HEADERS/seed เพื่อบังคับ setupDatabase รันใหม่ 1 ครั้งหลัง deploy
-const SCHEMA_VERSION = 14;
+const SCHEMA_VERSION = 15;
 
 // กลุ่มคำถามอบรม (5 กลุ่ม) — code ใช้ในชีต Questions, label แสดงผลภาษาไทย
 const QUESTION_GROUPS = [
@@ -78,7 +78,7 @@ const HEADERS = {
   EmailList: ['customer_id', 'email', 'description', 'status', 'clicked', 'replied', 'trained', 'last_sent', 'fullname', 'department'],
   MailTopics: ['topic', 'context', 'category', 'active', 'created_at', 'question', 'choices', 'correct', 'explain'],
   Questions: ['customer_id', 'group', 'question', 'choices', 'correct', 'explain', 'active', 'source', 'created_at'],
-  Schedule: ['customer_id', 'date', 'count', 'status', 'created_at', 'emails'],
+  Schedule: ['customer_id', 'date', 'count', 'status', 'created_at', 'emails', 'time'],
   OldTopics: ['topic', 'context', 'category', 'active', 'created_at', 'archived_at'],
   Queue: ['customer_id', 'email', 'topic', 'send_date', 'status', 'retry_count', 'last_error'],
   Results: ['customer_id', 'email', 'action', 'action_time', 'topic', 'score', 'name'],
@@ -850,6 +850,21 @@ function dateKey_(v) {
   return isNaN(d.getTime()) ? s : dateStr_(d);
 }
 
+// เวลาส่งของ schedule -> นาทีนับจากเที่ยงคืน (ดีฟอลต์ 08:00)
+// รับได้ทั้ง string 'HH:mm' และ Date (Sheets อาจแปลง 'HH:mm' เป็น time/Date object เอง)
+function hmToMin_(v) {
+  if (v instanceof Date) return v.getHours() * 60 + v.getMinutes();
+  const m = String(v == null ? '' : v).match(/(\d{1,2}):(\d{2})/);
+  if (!m) return 8 * 60;
+  return (Number(m[1]) || 0) * 60 + (Number(m[2]) || 0);
+}
+// normalize เวลาส่งเป็น string 'HH:mm' เสมอ (ไว้ส่งกลับ client + แสดงผล)
+function timeKey_(v) {
+  const min = Math.max(0, Math.min(24 * 60 - 1, hmToMin_(v)));
+  const h = Math.floor(min / 60), mm = min % 60;
+  return ('0' + h).slice(-2) + ':' + ('0' + mm).slice(-2);
+}
+
 // ปฏิทินของหน่วยงานผู้ใช้ + สถานะ trigger (สำหรับ admin)
 // สร้างเนื้อหาเมลจำลอง (ใช้ร่วมทั้ง preview และ send จริง) — ผู้ส่งที่แสดงเป็นชื่อ "ลวง"
 // เพื่อความสมจริงในหน้าจำลองเท่านั้น (ตอนส่งจริงผู้ส่งคือบัญชีระบบ ไม่ปลอม)
@@ -950,11 +965,11 @@ function buildCampaignMail_(target, topicRow, user) {
 // PHASE 2: ส่งคิวจริง — ส่งอีเมลถึงผู้รับในแถวคิวที่ status='queued' (อนุมัติโดยเจ้าของ 2026-06-25)
 // เคารพโควต้าจริงของ Gmail (MailApp.getRemainingDailyQuota) — ส่งจนหมดโควต้าแล้วหยุด ที่เหลือคงเป็น queued
 // อัปเดตสถานะรายแถว: sent / failed(+last_error,+retry_count). admin=ทุกแถว · customer=เฉพาะของตัวเอง
-function sendQueuedNow() {
-  setupDatabase();
-  const user = getCurrentUser_();
-  requireCustomer_(user);
-
+// core การส่งจริง — ใช้ร่วมทั้งปุ่มมือ (sendQueuedNow) และ trigger รายวัน (runDailySchedule)
+// customerFilter: null = ส่งทุกหน่วยงาน (admin/trigger) · ระบุ id = เฉพาะหน่วยงานนั้น (customer)
+// ไม่เรียก getCurrentUser_ เพื่อให้เรียกได้จาก context ของ trigger (ไม่มีผู้ใช้ล็อกอิน)
+// คืน {sent, failed, skipped} · เคารพโควต้าจริงของ Gmail (getRemainingDailyQuota)
+function sendQueuedRows_(customerFilter) {
   const sheet = sheet_(SHEETS.queue);
   const data = sheet.getDataRange().getValues();
   const idx = {};
@@ -969,7 +984,8 @@ function sendQueuedNow() {
 
   for (let r = 1; r < data.length; r++) {
     if (String(data[r][idx.status] || '').toLowerCase() !== 'queued') continue;
-    if (user.role === 'customer' && String(data[r][idx.customer_id]) !== String(user.customer_id)) continue;
+    const cid = String(data[r][idx.customer_id]);
+    if (customerFilter && cid !== String(customerFilter)) continue;
     if (remaining <= 0) { skipped++; continue; } // โควต้า Gmail หมด — ปล่อยคงสถานะ queued ไว้
 
     const email = String(data[r][idx.email] || '');
@@ -980,7 +996,7 @@ function sendQueuedNow() {
     }
     const topicRow = topicByName[String(data[r][idx.topic] || '').toLowerCase().trim()] || null;
     try {
-      const m = buildCampaignMail_({ email: email }, topicRow, user);
+      const m = buildCampaignMail_({ email: email }, topicRow, { customer_id: cid });
       MailApp.sendEmail({ to: m.to, subject: m.subject, htmlBody: m.html, name: 'IT Support' });
       sheet.getRange(r + 1, idx.status + 1).setValue('sent');
       remaining--; sent++;
@@ -992,10 +1008,20 @@ function sendQueuedNow() {
       failed++;
     }
   }
+  return { sent: sent, failed: failed, skipped: skipped };
+}
 
-  logAction_('SEND_QUEUE', 'OK', 'sent=' + sent + ', failed=' + failed + ', skipped=' + skipped);
+function sendQueuedNow() {
+  setupDatabase();
+  const user = getCurrentUser_();
+  requireCustomer_(user);
+
+  const filter = user.role === 'customer' ? user.customer_id : null; // admin = ทุกแถว
+  const res = sendQueuedRows_(filter);
+
+  logAction_('SEND_QUEUE', 'OK', 'sent=' + res.sent + ', failed=' + res.failed + ', skipped=' + res.skipped);
   return jsonSafe_({
-    sent: sent, failed: failed, skipped: skipped,
+    sent: res.sent, failed: res.failed, skipped: res.skipped,
     queue: listQueue(), dashboard: getDashboardData(), quota: computeQuota_(user)
   });
 }
@@ -1011,6 +1037,7 @@ function getSchedule() {
         date: dateKey_(r.date),
         count: Number(r.count) || 0,
         status: String(r.status || ''),
+        time: timeKey_(r.time),
         emails: String(r.emails || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean)
       };
     });
@@ -1035,6 +1062,8 @@ function setScheduleDay(payload) {
     : [];
   const emailsCsv = emails.join(',');
   const count = emails.length ? emails.length : Math.max(0, Number(payload && payload.count) || 0);
+  // เวลาส่งของวันนั้น (ชั่วโมง:นาที) — ดีฟอลต์ 08:00 · timeKey_ normalize + กันค่าเพี้ยน
+  const time = timeKey_(payload && payload.time ? payload.time : '08:00');
 
   const sheet = sheet_(SHEETS.schedule);
   const values = sheet.getDataRange().getValues();
@@ -1042,6 +1071,7 @@ function setScheduleDay(payload) {
   const ci = headers.indexOf('customer_id');
   const di = headers.indexOf('date');
   const emi = headers.indexOf('emails');
+  const tmi = headers.indexOf('time');
   let foundRow = -1;
   for (let i = 1; i < values.length; i++) {
     if (String(values[i][ci]) === user.customer_id && dateKey_(values[i][di]) === date) { foundRow = i + 1; break; }
@@ -1052,17 +1082,26 @@ function setScheduleDay(payload) {
     sheet.getRange(foundRow, headers.indexOf('count') + 1).setValue(count);
     sheet.getRange(foundRow, headers.indexOf('status') + 1).setValue('scheduled');
     if (emi >= 0) sheet.getRange(foundRow, emi + 1).setValue(emailsCsv);
+    if (tmi >= 0) sheet.getRange(foundRow, tmi + 1).setValue(time);
   } else {
-    sheet.appendRow([user.customer_id, date, count, 'scheduled', new Date(), emailsCsv]);
+    sheet.appendRow([user.customer_id, date, count, 'scheduled', new Date(), emailsCsv, time]);
   }
-  logAction_('SET_SCHEDULE_DAY', 'OK', date + '=' + count + (emails.length ? ' emails=' + emails.length : ''));
+  logAction_('SET_SCHEDULE_DAY', 'OK', date + ' ' + time + '=' + count + (emails.length ? ' emails=' + emails.length : ''));
   return getSchedule();
 }
 
-// เป้าหมายของ trigger — รันทุกวัน: หา schedule ของ "วันนี้" แล้วสร้างคิวให้แต่ละหน่วยงาน
+// เป้าหมายของ trigger — รันทุกชั่วโมง: ประมวลผลตารางของ "วันนี้" เฉพาะแถวที่ "ถึงเวลาส่งแล้ว"
+// (Apps Script ส่ง event object เป็น arg แรกให้ handler เสมอ — จึงไม่ใช้ arg นั้น แล้วเรียก core แยก)
 function runDailySchedule() {
+  return processSchedule_(false);
+}
+
+// core ประมวลผลตาราง — force=false: ส่งเฉพาะแถวที่เวลาถึงแล้ว (เทียบ time) · force=true: ส่งทุกแถวของวันนี้ทันที (ปุ่มทดสอบ)
+function processSchedule_(force) {
   setupDatabase();
   const today = todayStr_();
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
   const sheet = sheet_(SHEETS.schedule);
   const values = sheet.getDataRange().getValues();
   const headers = values[0];
@@ -1071,19 +1110,46 @@ function runDailySchedule() {
   const cnt = headers.indexOf('count');
   const st = headers.indexOf('status');
   const emi = headers.indexOf('emails');
+  const tmi = headers.indexOf('time');
   let done = 0;
+  const custIds = {}; // หน่วยงานที่มี schedule ถึงเวลาแล้ว — ไว้ส่งอีเมลจริงต่อ
   for (let i = 1; i < values.length; i++) {
     if (dateKey_(values[i][di]) !== today) continue;
     if (String(values[i][st]).toLowerCase() === 'done') continue;
+    // ยังไม่ถึงเวลาส่งของแถวนี้ (เว้นแต่ force) — ปล่อยไว้ให้ trigger รอบชั่วโมงถัดไปมาเก็บ
+    const schedMin = tmi >= 0 ? hmToMin_(values[i][tmi]) : 8 * 60;
+    if (!force && schedMin > nowMin) continue;
+    const cid = String(values[i][ci]);
     const emailsList = emi >= 0
       ? String(values[i][emi] || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean)
       : [];
-    const made = createQueueForCustomer_(String(values[i][ci]), Number(values[i][cnt]) || 1, emailsList);
+    const made = createQueueForCustomer_(cid, Number(values[i][cnt]) || 1, emailsList);
     sheet.getRange(i + 1, st + 1).setValue('done');
     done += made;
+    if (made > 0) custIds[cid] = true;
   }
-  logAction_('RUN_DAILY_SCHEDULE', 'OK', today + ' queued=' + done);
-  return { ok: true, date: today, queued: done };
+
+  // PHASE 2: หลังสร้างคิวแล้ว "ส่งอีเมลจริง" ทันที (เดิม trigger สร้างแค่คิว เมลไม่เคยออก)
+  // ส่งต่อหน่วยงานที่ถึงเวลาแล้ว — เคารพโควต้า Gmail (getRemainingDailyQuota) ใน sendQueuedRows_
+  let sent = 0, failed = 0, skipped = 0;
+  Object.keys(custIds).forEach(function (cid) {
+    const res = sendQueuedRows_(cid);
+    sent += res.sent; failed += res.failed; skipped += res.skipped;
+  });
+
+  logAction_('RUN_DAILY_SCHEDULE', 'OK',
+    today + ' queued=' + done + ' sent=' + sent + ' failed=' + failed + ' skipped=' + skipped + (force ? ' (forced)' : ''));
+  return { ok: true, date: today, queued: done, sent: sent, failed: failed, skipped: skipped };
+}
+
+// รันตารางของ "วันนี้" ทันที (admin กดทดสอบเอง ไม่ต้องรอ trigger + ไม่สนเวลาที่ตั้ง) — สร้างคิว + ส่งจริง
+function runScheduleNow() {
+  setupDatabase();
+  requireAdmin_(getCurrentUser_());
+  const res = processSchedule_(true); // force = ยิงทุกแถวของวันนี้ทันที ไม่รอเวลาที่ตั้ง
+  logAction_('RUN_SCHEDULE_NOW', 'OK',
+    res.date + ' queued=' + res.queued + ' sent=' + res.sent + ' failed=' + res.failed);
+  return jsonSafe_({ ran: res, schedule: getSchedule() });
 }
 
 // สร้างคิวให้หน่วยงานที่ระบุ (ใช้โดย trigger — ไม่อิง getCurrentUser_) เคารพโควต้า
@@ -1132,8 +1198,10 @@ function installDailyTrigger() {
   setupDatabase();
   requireAdmin_(getCurrentUser_());
   removeDailyTrigger_();
-  ScriptApp.newTrigger(TRIGGER_FN).timeBased().everyDays(1).atHour(8).create();
-  logAction_('INSTALL_TRIGGER', 'OK', 'daily 08:00');
+  // ยิงทุกชั่วโมง — แต่ละรอบ processSchedule_ จะส่งเฉพาะแถวที่ "ถึงเวลา" ตาม time ที่ตั้งไว้
+  // (เดิมเป็นรายวัน 08:00 — เปลี่ยนเป็นรายชั่วโมงเพื่อรองรับการเลือกเวลาส่งเป็นชั่วโมง)
+  ScriptApp.newTrigger(TRIGGER_FN).timeBased().everyHours(1).create();
+  logAction_('INSTALL_TRIGGER', 'OK', 'hourly (time-aware)');
   return jsonSafe_(triggerStatus_());
 }
 

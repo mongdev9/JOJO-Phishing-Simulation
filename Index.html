@@ -1450,7 +1450,8 @@
         const isDone = sc && sc.status === 'done';
         const autoOn = !!(d.trigger && d.trigger.installed);
         const willAuto = sc && !isDone && !isPast && autoOn; // วันนี้/อนาคต + เปิด trigger = จะถูกยิงอัตโนมัติ
-        const stateTxt = isDone ? '✓ ส่งแล้ว' : willAuto ? '⏰ ยิงอัตโนมัติ' : '• รอส่ง';
+        const timeTxt = sc && sc.time ? sc.time + ' ' : '';
+        const stateTxt = isDone ? '✓ ส่งแล้ว' : willAuto ? '⏰ ' + timeTxt + 'ยิงอัตโนมัติ' : '• ' + timeTxt + 'รอส่ง';
         const badge = sc
           ? `<span class="cal-info${isDone ? ' done' : willAuto ? ' auto' : ''}">✉ ${sc.count}<small>${stateTxt}</small></span>`
           : '';
@@ -1461,11 +1462,13 @@
         <div class="section">
           <div class="section-title">ระบบยิงอัตโนมัติ (Google Trigger)</div>
           <div class="section-body">
-            <p>สถานะ: <b>${d.trigger && d.trigger.installed ? 'เปิดอยู่ ✔ (รันทุกวันราว 08:00)' : 'ยังไม่เปิด'}</b></p>
+            <p>สถานะ: <b>${d.trigger && d.trigger.installed ? 'เปิดอยู่ ✔ (รันทุกชั่วโมง)' : 'ยังไม่เปิด'}</b></p>
+            <p class="muted">ระบบเช็คทุกชั่วโมง เมื่อถึง<b>เวลา</b>ที่ตั้งของแต่ละวัน จะสร้างคิว <b>แล้วส่งอีเมลจริง</b>ให้รายชื่อที่ตั้งไว้ทันที (เลือกเวลาได้ในกล่องตั้งส่งของแต่ละวัน · ลิงก์จบที่หน้าอบรม · เคารพโควต้า Gmail)</p>
             <div class="actions">
               ${d.trigger && d.trigger.installed
                 ? `<button class="btn secondary" onclick="toggleTrigger(false)">ปิดระบบอัตโนมัติ</button>`
                 : `<button class="btn" onclick="toggleTrigger(true)">เปิดระบบอัตโนมัติ</button>`}
+              <button class="btn" onclick="runScheduleNow()">▶ ยิงตารางวันนี้เดี๋ยวนี้ (ทดสอบ)</button>
             </div>
             <div id="trigMsg"></div>
           </div>
@@ -1521,6 +1524,7 @@
           <div class="section-body">
             <div class="actions" style="margin-bottom:8px;">
               <label>จำนวน <input id="schedDayCount" type="number" min="1" max="30" value="${(dayRow && dayRow.count) || 5}" style="width:80px;"></label>
+              <label>เวลาส่ง <input id="schedDayTime" type="time" value="${escapeAttr((dayRow && dayRow.time) || '08:00')}" style="width:120px;"></label>
               <button class="btn secondary" onclick="schedSelect('random')">🎲 สุ่มเลือก</button>
               <button class="btn secondary" onclick="schedSelect('queue')">📋 ตามคิว (ลำดับแรก)</button>
               <button class="btn secondary" onclick="schedSelect('clear')">ล้างที่เลือก</button>
@@ -1557,7 +1561,8 @@
     function saveScheduleDay() {
       const emails = schedChecks().filter((b) => b.checked).map((b) => b.value);
       if (!emails.length) { setMsg('schedDayMsg', 'เลือกอย่างน้อย 1 รายชื่อ (หรือกดสุ่ม/ตามคิว)', true); return; }
-      callServer('setScheduleDay', { date: state.scheduleSel, emails }, (res) => {
+      const time = (document.getElementById('schedDayTime') || {}).value || '08:00';
+      callServer('setScheduleDay', { date: state.scheduleSel, emails, time }, (res) => {
         state.scheduleData = res; drawSchedule();
       }, 'schedDayMsg');
     }
@@ -1571,6 +1576,20 @@
       callServer(on ? 'installDailyTrigger' : 'removeDailyTrigger', null, (res) => {
         if (state.scheduleData) state.scheduleData.trigger = res;
         drawSchedule();
+      }, 'trigMsg');
+    }
+
+    // แอดมินกดยิงตารางของวันนี้เดี๋ยวนี้ (สร้างคิว + ส่งจริง) ไม่ต้องรอ trigger 08:00
+    function runScheduleNow() {
+      if (!confirm('ยิงตารางของวันนี้เดี๋ยวนี้?\nระบบจะสร้างคิวแล้วส่งอีเมลจริงให้รายชื่อที่ตั้งไว้ของวันนี้')) return;
+      callServer('runScheduleNow', null, (res) => {
+        state.scheduleData = res.schedule; drawSchedule();
+        const ran = res.ran || {};
+        let msg = `เสร็จ: สร้างคิว ${ran.queued || 0} · ส่งสำเร็จ ${ran.sent || 0}`;
+        if (ran.failed) msg += ` · ล้มเหลว ${ran.failed}`;
+        if (ran.skipped) msg += ` · ค้างเพราะโควต้า Gmail หมด ${ran.skipped}`;
+        if (!ran.queued) msg = 'วันนี้ไม่มีตารางที่ตั้งไว้ (หรือถูกยิงไปแล้ว)';
+        setMsg('trigMsg', msg, !!ran.failed);
       }, 'trigMsg');
     }
 
