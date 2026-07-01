@@ -965,11 +965,16 @@ function buildCampaignMail_(target, topicRow, user) {
 // PHASE 2: ส่งคิวจริง — ส่งอีเมลถึงผู้รับในแถวคิวที่ status='queued' (อนุมัติโดยเจ้าของ 2026-06-25)
 // เคารพโควต้าจริงของ Gmail (MailApp.getRemainingDailyQuota) — ส่งจนหมดโควต้าแล้วหยุด ที่เหลือคงเป็น queued
 // อัปเดตสถานะรายแถว: sent / failed(+last_error,+retry_count). admin=ทุกแถว · customer=เฉพาะของตัวเอง
-// core การส่งจริง — ใช้ร่วมทั้งปุ่มมือ (sendQueuedNow) และ trigger รายวัน (runDailySchedule)
-// customerFilter: null = ส่งทุกหน่วยงาน (admin/trigger) · ระบุ id = เฉพาะหน่วยงานนั้น (customer)
+// core การส่งจริง — ใช้ร่วมทั้งปุ่มมือ (sendQueuedNow) และ trigger รายชั่วโมง (processSchedule_)
+// opts.customerFilter: null = ส่งทุกหน่วยงาน (admin/trigger) · ระบุ id = เฉพาะหน่วยงานนั้น (customer)
+// opts.onlyRows: map ของเลขแถวชีต (1-based) -> true · ถ้าระบุ = ส่ง "เฉพาะแถวเหล่านั้น" เท่านั้น
+//   (schedule ใช้ตัวนี้เพื่อส่งเฉพาะแถวที่เพิ่งสร้าง ไม่กวาดส่งคิวค้างเก่าซ้ำ)
 // ไม่เรียก getCurrentUser_ เพื่อให้เรียกได้จาก context ของ trigger (ไม่มีผู้ใช้ล็อกอิน)
 // คืน {sent, failed, skipped} · เคารพโควต้าจริงของ Gmail (getRemainingDailyQuota)
-function sendQueuedRows_(customerFilter) {
+function sendQueuedRows_(opts) {
+  opts = opts || {};
+  const customerFilter = opts.customerFilter || null;
+  const onlyRows = opts.onlyRows || null;
   const sheet = sheet_(SHEETS.queue);
   const data = sheet.getDataRange().getValues();
   const idx = {};
@@ -984,6 +989,7 @@ function sendQueuedRows_(customerFilter) {
 
   for (let r = 1; r < data.length; r++) {
     if (String(data[r][idx.status] || '').toLowerCase() !== 'queued') continue;
+    if (onlyRows && !onlyRows[r + 1]) continue; // จำกัดเฉพาะแถวที่ระบุ (r+1 = เลขแถวจริงในชีต)
     const cid = String(data[r][idx.customer_id]);
     if (customerFilter && cid !== String(customerFilter)) continue;
     if (remaining <= 0) { skipped++; continue; } // โควต้า Gmail หมด — ปล่อยคงสถานะ queued ไว้
@@ -1017,7 +1023,7 @@ function sendQueuedNow() {
   requireCustomer_(user);
 
   const filter = user.role === 'customer' ? user.customer_id : null; // admin = ทุกแถว
-  const res = sendQueuedRows_(filter);
+  const res = sendQueuedRows_({ customerFilter: filter }); // ปุ่มมือ = กวาดส่งทุก queued (ตามที่โชว์จำนวนใน UI)
 
   logAction_('SEND_QUEUE', 'OK', 'sent=' + res.sent + ', failed=' + res.failed + ', skipped=' + res.skipped);
   return jsonSafe_({
@@ -1112,7 +1118,7 @@ function processSchedule_(force) {
   const emi = headers.indexOf('emails');
   const tmi = headers.indexOf('time');
   let done = 0;
-  const custIds = {}; // หน่วยงานที่มี schedule ถึงเวลาแล้ว — ไว้ส่งอีเมลจริงต่อ
+  const createdRows = {}; // เลขแถวชีต Queue (1-based) ที่ "เพิ่งสร้างรอบนี้" — ส่งเฉพาะแถวเหล่านี้
   for (let i = 1; i < values.length; i++) {
     if (dateKey_(values[i][di]) !== today) continue;
     if (String(values[i][st]).toLowerCase() === 'done') continue;
@@ -1125,17 +1131,17 @@ function processSchedule_(force) {
       : [];
     const made = createQueueForCustomer_(cid, Number(values[i][cnt]) || 1, emailsList);
     sheet.getRange(i + 1, st + 1).setValue('done');
-    done += made;
-    if (made > 0) custIds[cid] = true;
+    done += made.count;
+    for (let k = 0; k < made.count; k++) createdRows[made.startRow + k] = true; // จองแถวใหม่ไว้ส่ง
   }
 
-  // PHASE 2: หลังสร้างคิวแล้ว "ส่งอีเมลจริง" ทันที (เดิม trigger สร้างแค่คิว เมลไม่เคยออก)
-  // ส่งต่อหน่วยงานที่ถึงเวลาแล้ว — เคารพโควต้า Gmail (getRemainingDailyQuota) ใน sendQueuedRows_
+  // PHASE 2: หลังสร้างคิวแล้ว "ส่งอีเมลจริง" ทันที — เฉพาะแถวที่เพิ่งสร้างรอบนี้เท่านั้น
+  // (ไม่กวาดส่งคิวค้างเก่าซ้ำ ป้องกัน "สร้าง 1 ส่ง 2") · เคารพโควต้า Gmail ใน sendQueuedRows_
   let sent = 0, failed = 0, skipped = 0;
-  Object.keys(custIds).forEach(function (cid) {
-    const res = sendQueuedRows_(cid);
-    sent += res.sent; failed += res.failed; skipped += res.skipped;
-  });
+  if (done > 0) {
+    const res = sendQueuedRows_({ onlyRows: createdRows });
+    sent = res.sent; failed = res.failed; skipped = res.skipped;
+  }
 
   logAction_('RUN_DAILY_SCHEDULE', 'OK',
     today + ' queued=' + done + ' sent=' + sent + ' failed=' + failed + ' skipped=' + skipped + (force ? ' (forced)' : ''));
@@ -1153,9 +1159,10 @@ function runScheduleNow() {
 }
 
 // สร้างคิวให้หน่วยงานที่ระบุ (ใช้โดย trigger — ไม่อิง getCurrentUser_) เคารพโควต้า
+// คืน { count, startRow } — startRow = เลขแถวชีต (1-based) ของแถวแรกที่เพิ่ง append (ไว้ให้ schedule ส่งเฉพาะแถวใหม่)
 function createQueueForCustomer_(customerId, count, emailsList) {
   const quota = computeQuota_({ customer_id: customerId });
-  if (quota.available <= 0) return 0;
+  if (quota.available <= 0) return { count: 0, startRow: 0 };
   const active = rows_(SHEETS.emailList).filter(function (r) {
     return String(r.customer_id) === String(customerId) && String(r.status).toLowerCase() === 'active';
   });
@@ -1178,8 +1185,9 @@ function createQueueForCustomer_(customerId, count, emailsList) {
     add.push([customerId, t.email, topic ? topic.topic : 'Awareness Training',
       new Date(now.getTime() + randomInt_(5, 180) * 60000), 'queued', 0, '']);
   });
-  if (add.length) sheet.getRange(sheet.getLastRow() + 1, 1, add.length, HEADERS.Queue.length).setValues(add);
-  return add.length;
+  const startRow = sheet.getLastRow() + 1;
+  if (add.length) sheet.getRange(startRow, 1, add.length, HEADERS.Queue.length).setValues(add);
+  return { count: add.length, startRow: add.length ? startRow : 0 };
 }
 
 // ===== จัดการ Google time-based trigger (admin เท่านั้น) =====
