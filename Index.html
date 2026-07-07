@@ -711,6 +711,152 @@
       `;
     }
 
+    // ===== รอบการจัดส่ง (Batches) + รีส่ง + ติ๊ก "แจ้งแล้ว = ผ่าน" =====
+    function respKeyJs(cid, email) {
+      return String(cid == null ? '' : cid) + '|' + String(email == null ? '' : email).toLowerCase().trim();
+    }
+    // จำนวนวันก่อนรีส่ง (จาก Settings · ดีฟอลต์ 5)
+    function resendDays() {
+      const s = (state.data.settings || []).find((x) => x.key === 'resend_after_days');
+      const n = s ? Number(s.value) : 5;
+      return (n && n > 0) ? n : 5;
+    }
+    // map สถานะการตอบสนองต่อคน (จากชีต Results ที่มากับ bootstrap)
+    function responseMaps() {
+      const clicked = {}, responded = {}, reported = {};
+      (state.data.results || []).forEach((r) => {
+        const a = String(r.action || '').toLowerCase();
+        const k = respKeyJs(r.customer_id, r.email);
+        if (a === 'clicked' || a === 'trained' || a === 'passed') { clicked[k] = true; responded[k] = true; }
+        if (a === 'reported') { reported[k] = true; responded[k] = true; }
+      });
+      return { clicked, responded, reported };
+    }
+    // สร้าง HTML รายการล๊อต — แต่ละล๊อตกางดูรายชื่อผู้รับ + สถานะ + ติ๊ก "แจ้งแล้ว=ผ่าน"
+    function batchesHtml() {
+      const queue = state.data.queue || [];
+      if (!queue.length) return '<p class="muted">ยังไม่มีรอบการจัดส่ง — สร้างคิวแล้วส่งจริงก่อน</p>';
+      const maps = responseMaps();
+      const clicked = maps.clicked, responded = maps.responded, reported = maps.reported;
+      const days = resendDays();
+      const now = Date.now();
+      const cutoff = days * 24 * 60 * 60 * 1000;
+
+      const nameByEmail = {};
+      (state.data.emailList || []).forEach((r) => { nameByEmail[String(r.email).toLowerCase().trim()] = r.fullname || ''; });
+
+      // เวลาส่งล่าสุดต่อคน (ทุกล๊อตรวมกัน) — ใช้ตัดสิน "ครบกำหนดรีส่ง"
+      const lastSent = {};
+      queue.forEach((r) => {
+        if (String(r.status).toLowerCase() !== 'sent') return;
+        const k = respKeyJs(r.customer_id, r.email);
+        const raw = r.sent_at || r.send_date;
+        const t = raw ? new Date(raw).getTime() : NaN;
+        if (!isNaN(t) && (!(k in lastSent) || t > lastSent[k])) lastSent[k] = t;
+      });
+
+      // จัดกลุ่มตาม batch_id
+      const groups = {};
+      queue.forEach((r) => {
+        const bid = String(r.batch_id || '(ก่อนมีระบบล๊อต)');
+        (groups[bid] || (groups[bid] = [])).push(r);
+      });
+      const bids = Object.keys(groups).sort().reverse(); // ล่าสุดก่อน (batch id มี timestamp)
+
+      return bids.map((bid) => {
+        const list = groups[bid];
+        let cSent = 0, cClick = 0, cRep = 0, cDue = 0;
+        const body = list.map((r) => {
+          const email = String(r.email || '');
+          const k = respKeyJs(r.customer_id, email);
+          const st = String(r.status || '').toLowerCase();
+          const isClicked = !!clicked[k];
+          const isReported = !!reported[k];
+          const due = (st === 'sent' && !responded[k] && (k in lastSent) && (now - lastSent[k] >= cutoff));
+          if (st === 'sent') cSent++;
+          if (isClicked) cClick++;
+          if (isReported) cRep++;
+          if (due) cDue++;
+          const stLabel = st === 'sent' ? '<span style="color:var(--green-3)">ส่งแล้ว</span>'
+            : st === 'queued' ? '<span class="muted">รอส่ง</span>'
+            : st === 'failed' ? '<span style="color:#c0392b">ล้มเหลว</span>' : escapeHtml(st);
+          const round = Number(r.resend_round || 0);
+          const roundLabel = round > 0 ? `รีส่ง #${round}` : 'รอบแรก';
+          const dueLabel = due ? '<b style="color:#c0392b">⏰ ครบกำหนด</b>'
+            : responded[k] ? '<span class="muted">–</span>'
+            : st === 'sent' ? '<span class="muted">รอครบกำหนด</span>' : '<span class="muted">–</span>';
+          // ติ๊กได้เฉพาะคนที่ "ยังไม่คลิก" · ติ๊กแล้ว = reported (ผ่าน)
+          const cb = `<input type="checkbox" ${isReported ? 'checked' : ''} ${isClicked ? 'disabled title="คลิกลิงก์ไปแล้ว ติ๊กผ่านไม่ได้"' : ''} onchange="toggleReported(this, '${escapeAttr(email)}')">`;
+          return `<tr>
+            <td>${escapeHtml(email)}</td>
+            <td>${escapeHtml(nameByEmail[email.toLowerCase().trim()] || '')}</td>
+            <td>${escapeHtml(r.topic || '')}</td>
+            <td style="text-align:center;">${stLabel}</td>
+            <td style="text-align:center;">${isClicked ? '✔' : '–'}</td>
+            <td style="text-align:center;">${escapeHtml(roundLabel)}</td>
+            <td style="text-align:center;">${dueLabel}</td>
+            <td style="text-align:center;">${cb}</td>
+          </tr>`;
+        }).join('');
+        const summary = `<b>${escapeHtml(bid)}</b> · ${list.length} คน · ส่งแล้ว ${cSent} · คลิก ${cClick} · แจ้งแล้ว ${cRep}${cDue ? ` · <span style="color:#c0392b">ครบกำหนดรีส่ง ${cDue}</span>` : ''}`;
+        return `<details class="batch" ${cDue ? 'open' : ''} style="margin-bottom:10px;border:1px solid var(--line);border-radius:var(--radius-sm);">
+          <summary style="cursor:pointer;padding:10px 12px;user-select:none;">${summary}</summary>
+          <div class="table-wrap" style="max-height:360px;border:none;border-top:1px solid var(--line);border-radius:0;"><table>
+            <thead><tr><th>อีเมล</th><th>ชื่อ</th><th>หัวข้อ</th><th>สถานะส่ง</th><th>คลิก</th><th>รอบ</th><th>รีส่ง</th><th>แจ้งแล้ว=ผ่าน</th></tr></thead>
+            <tbody>${body}</tbody>
+          </table></div>
+        </details>`;
+      }).join('');
+    }
+
+    // ปุ่ม/ตัวจัดการ: ตรวจ+รีส่งคนครบกำหนดเดี๋ยวนี้
+    function resendDue() {
+      const btn = document.getElementById('resendBtn');
+      if (btn) btn.disabled = true;
+      setMsg('resendMsg', 'กำลังตรวจและรีส่ง...', false);
+      google.script.run
+        .withSuccessHandler((res) => {
+          state.data.queue = res.queue;
+          state.data.results = res.results;
+          state.data.dashboard = res.dashboard;
+          if (res.quota) state.data.quota = res.quota;
+          const r = res.ran || {};
+          let msg = `ครบกำหนด ${r.due || 0} คน · รีส่งสำเร็จ ${r.sent || 0}`;
+          if (r.failed) msg += ` · ล้มเหลว ${r.failed}`;
+          if (r.skipped) msg += ` · โควต้า Gmail หมด ${r.skipped} (ค้างไว้)`;
+          if (r.clampedOut) msg += ` · เกินโควต้าวันนี้ ${r.clampedOut} (ยกไปพรุ่งนี้)`;
+          if (!r.due) msg = 'ยังไม่มีใครครบกำหนดรีส่ง';
+          renderSendMail();
+          renderResults();
+          setMsg('resendMsg', msg, !!r.failed);
+        })
+        .withFailureHandler((err) => {
+          const b = document.getElementById('resendBtn'); if (b) b.disabled = false;
+          setMsg('resendMsg', err && err.message ? err.message : String(err), true);
+        })
+        .resendDueNow();
+    }
+
+    // ติ๊ก/ยกเลิกติ๊ก "แจ้งแล้ว = ผ่าน" ต่อคน
+    function toggleReported(el, email) {
+      const on = el.checked;
+      el.disabled = true;
+      const handler = (res) => {
+        state.data.queue = res.queue;
+        state.data.results = res.results;
+        if (res.dashboard) state.data.dashboard = res.dashboard;
+        renderSendMail();
+        renderResults();
+      };
+      const fail = (err) => {
+        el.checked = !on; el.disabled = false;
+        alert(err && err.message ? err.message : String(err));
+      };
+      const runner = google.script.run.withSuccessHandler(handler).withFailureHandler(fail);
+      if (on) runner.markReported({ email: email });
+      else runner.unmarkReported({ email: email });
+    }
+
     function renderSendMail() {
       const q = state.data.quota || { available: 0, customer_remaining: 0, customer_cap: 0, platform_remaining: 0, platform_cap: 0 };
       const activeTopics = (state.data.topics || []).filter((t) => String(t.active).toLowerCase() !== 'false');
@@ -722,6 +868,8 @@
         : '<span class="muted">ยังไม่มีหัวข้อที่เปิดใช้งาน — ไปเปิดที่หน้า Topics ก่อน</span>';
       const max = Math.max(q.available, 0);
       const queuedCount = (state.data.queue || []).filter((r) => String(r.status).toLowerCase() === 'queued').length;
+      const resendAfter = resendDays();
+      const batches = batchesHtml();
       // แบบกำหนดเอง: dropdown หัวข้อ + ติ๊กรายชื่อเป้าหมาย active เอง
       const activeTargets = (state.data.emailList || []).filter((r) => String(r.status).toLowerCase() === 'active');
       const topicOptions = activeTopics.length
@@ -790,9 +938,20 @@
               <button class="btn" onclick="sendQueue()" ${queuedCount > 0 ? '' : 'disabled'}>✉ ส่งคิวจริง (${queuedCount} รายการรอส่ง)</button>
               <span id="sendQueueMsg" class="muted"></span>
             </div>
-            <div class="table-wrap resizable" id="queueTableWrap">${tableHtml(state.data.queue, ['customer_id','email','topic','send_date','status','retry_count','last_error'])}</div>
+            <div class="table-wrap resizable" id="queueTableWrap">${tableHtml(state.data.queue, ['customer_id','email','topic','send_date','status','retry_count','last_error','batch_id','sent_at','resend_round'])}</div>
             <div class="resize-handle" title="ลาก (เมาส์หรือนิ้ว) เพื่อปรับความสูงตาราง"
                  onpointerdown="startQueueResize(event)">⣿ ลากปรับความสูง</div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">รอบการจัดส่ง (Batches) — ล๊อตนี้ส่งให้ใครบ้าง</div>
+          <div class="section-body">
+            <div class="actions" style="margin-bottom:8px;">
+              <button class="btn secondary" id="resendBtn" onclick="resendDue()">🔁 ตรวจ+รีส่งคนครบกำหนดเดี๋ยวนี้</button>
+              <span id="resendMsg" class="muted"></span>
+            </div>
+            <p class="muted">ระบบรีส่งอัตโนมัติทุก <b>${resendAfter}</b> วัน ให้คนที่ "ยังไม่คลิก และยังไม่ถูกติ๊กว่าแจ้ง" (ต้องเปิด "ระบบยิงอัตโนมัติ" ในหน้า Schedule) · ติ๊ก <b>แจ้งแล้ว=ผ่าน</b> ได้เฉพาะคนที่ยังไม่คลิก → จะหยุดรีส่งคนนั้น</p>
+            ${batches}
           </div>
         </div>
       `;
@@ -1412,6 +1571,7 @@
           <td>${escapeHtml(p.fullname || '')}</td>
           <td>${escapeHtml(p.department || '')}</td>
           <td style="text-align:center;">${p.clicked ? '✔' : '–'}</td>
+          <td style="text-align:center;">${p.reported ? '✔' : '–'}</td>
           <td style="text-align:center;">${p.trained ? '✔' : '–'}</td>
           <td style="text-align:center;">${p.passed ? '✔' : '–'}</td>
           <td style="text-align:center;">${Number(p.score || 0)}</td>
@@ -1424,8 +1584,8 @@
         <div class="section">
           <div class="section-title">รายชื่อผู้เข้าอบรม — ${escapeHtml(d.org || '')} (${(d.people || []).length})</div>
           <div class="section-body"><div class="table-wrap"><table>
-            <thead><tr><th>อีเมล</th><th>ชื่อ</th><th>แผนก</th><th>คลิก</th><th>อบรม</th><th>ผ่าน</th><th>คะแนน</th></tr></thead>
-            <tbody>${peopleRows || '<tr><td colspan="7" class="muted">ยังไม่มีรายชื่อ</td></tr>'}</tbody>
+            <thead><tr><th>อีเมล</th><th>ชื่อ</th><th>แผนก</th><th>คลิก</th><th>แจ้ง</th><th>อบรม</th><th>ผ่าน</th><th>คะแนน</th></tr></thead>
+            <tbody>${peopleRows || '<tr><td colspan="8" class="muted">ยังไม่มีรายชื่อ</td></tr>'}</tbody>
           </table></div></div>
         </div>
       `;
@@ -1674,11 +1834,12 @@
         fullname: p.fullname || '',
         department: p.department || '',
         clicked: p.clicked ? 'yes' : 'no',
+        reported: p.reported ? 'yes' : 'no',
         trained: p.trained ? 'yes' : 'no',
         passed: p.passed ? 'yes' : 'no',
         score: Number(p.score || 0)
       }));
-      const ws = XLSX.utils.json_to_sheet(data, { header: ['email', 'fullname', 'department', 'clicked', 'trained', 'passed', 'score'] });
+      const ws = XLSX.utils.json_to_sheet(data, { header: ['email', 'fullname', 'department', 'clicked', 'reported', 'trained', 'passed', 'score'] });
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Report');
       XLSX.writeFile(wb, 'jojo_report_' + (d.org || 'all') + '.xlsx');

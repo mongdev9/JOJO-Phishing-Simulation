@@ -39,7 +39,7 @@ const APP = {
 const SPREADSHEET_ID = CONFIG.spreadsheetId;
 
 // เพิ่มเลขนี้ทุกครั้งที่แก้ HEADERS/seed เพื่อบังคับ setupDatabase รันใหม่ 1 ครั้งหลัง deploy
-const SCHEMA_VERSION = 15;
+const SCHEMA_VERSION = 16;
 
 // กลุ่มคำถามอบรม (5 กลุ่ม) — code ใช้ในชีต Questions, label แสดงผลภาษาไทย
 const QUESTION_GROUPS = [
@@ -80,7 +80,7 @@ const HEADERS = {
   Questions: ['customer_id', 'group', 'question', 'choices', 'correct', 'explain', 'active', 'source', 'created_at'],
   Schedule: ['customer_id', 'date', 'count', 'status', 'created_at', 'emails', 'time'],
   OldTopics: ['topic', 'context', 'category', 'active', 'created_at', 'archived_at'],
-  Queue: ['customer_id', 'email', 'topic', 'send_date', 'status', 'retry_count', 'last_error'],
+  Queue: ['customer_id', 'email', 'topic', 'send_date', 'status', 'retry_count', 'last_error', 'batch_id', 'sent_at', 'resend_round'],
   Results: ['customer_id', 'email', 'action', 'action_time', 'topic', 'score', 'name'],
   Reports: ['timestamp', 'customer_id', 'report_type', 'summary'],
   Settings: ['key', 'value', 'description'],
@@ -518,12 +518,14 @@ function getReportData() {
   results.forEach(function (r) {
     const k = keyOf_(r.email, r.name);
     if (!k) return;
-    const o = agg[k] || (agg[k] = { email: String(r.email || ''), name: String(r.name || ''), clicked: false, trained: false, passed: false, score: 0 });
+    const o = agg[k] || (agg[k] = { email: String(r.email || ''), name: String(r.name || ''), clicked: false, trained: false, passed: false, reported: false, score: 0 });
     if (!o.name && r.name) o.name = String(r.name);
     const a = String(r.action || '').toLowerCase();
     if (a === 'clicked') o.clicked = true;
     if (a === 'trained' || a === 'passed') { o.trained = true; o.clicked = true; }
     if (a === 'passed') o.passed = true;
+    // แจ้งฟิชชิ่งโดยไม่คลิก = ตรวจจับได้ ถือว่า "ผ่าน" (แต่ไม่ตั้ง clicked)
+    if (a === 'reported') { o.reported = true; o.passed = true; }
     const sc = Number(r.score);
     if (!isNaN(sc) && sc > o.score) o.score = sc;
   });
@@ -534,10 +536,10 @@ function getReportData() {
     const k = keyOf_(t.email, '');
     const hit = k && agg[k];
     if (hit) used[k] = true;
-    const o = hit || { clicked: false, trained: false, passed: false, score: 0 };
+    const o = hit || { clicked: false, trained: false, passed: false, reported: false, score: 0 };
     return {
       email: t.email, fullname: t.fullname || '', department: t.department || '',
-      clicked: o.clicked, trained: o.trained, passed: o.passed, score: o.score
+      clicked: o.clicked, trained: o.trained, passed: o.passed, reported: o.reported, score: o.score
     };
   });
 
@@ -547,7 +549,7 @@ function getReportData() {
     const o = agg[k];
     people.push({
       email: o.email || '', fullname: o.name || '(ไม่ระบุชื่อ)', department: '',
-      clicked: o.clicked, trained: o.trained, passed: o.passed, score: o.score
+      clicked: o.clicked, trained: o.trained, passed: o.passed, reported: o.reported, score: o.score
     });
   });
 
@@ -712,6 +714,7 @@ function createRandomQueue(payload) {
   const sheet = sheet_(SHEETS.queue);
   const rowsToAdd = [];
   const now = new Date();
+  const batchId = newBatchId_('L'); // ล๊อตนี้ทั้งหมดใช้รหัสเดียวกัน
 
   targets.slice(0, count).forEach(function (target, index) {
     const topic = topics.length ? topics[index % topics.length] : null;
@@ -722,7 +725,10 @@ function createRandomQueue(payload) {
       new Date(now.getTime() + randomInt_(5, 180) * 60000),
       'queued',
       0,
-      ''
+      '',
+      batchId,   // batch_id
+      '',        // sent_at (เติมตอนส่งจริง)
+      0          // resend_round (0 = ส่งรอบแรก)
     ]);
   });
 
@@ -804,6 +810,7 @@ function createManualQueue(payload) {
   const sheet = sheet_(SHEETS.queue);
   const rowsToAdd = [];
   const now = new Date();
+  const batchId = newBatchId_('L'); // ล๊อตนี้ทั้งหมดใช้รหัสเดียวกัน
   chosen.slice(0, count).forEach(function (em) {
     rowsToAdd.push([
       user.customer_id,
@@ -812,7 +819,10 @@ function createManualQueue(payload) {
       new Date(now.getTime() + randomInt_(5, 180) * 60000),
       'queued',
       0,
-      ''
+      '',
+      batchId,   // batch_id
+      '',        // sent_at
+      0          // resend_round
     ]);
   });
 
@@ -962,6 +972,18 @@ function buildCampaignMail_(target, topicRow, user) {
   return { to: email, subject: subject, html: html, link: link };
 }
 
+// ===== รอบการจัดส่ง (Batch/ล๊อต) + รีส่งอัตโนมัติเมื่อครบกำหนด =====
+// รหัสล๊อต/รอบการจัดส่ง — ติดกับทุกแถวคิวที่ "สร้างพร้อมกัน 1 ครั้ง" (prefix 'L'=ปกติ, 'R'=รีส่ง)
+// ทำให้ดูย้อนได้ว่าล๊อตไหนส่งให้ใครบ้าง
+function newBatchId_(prefix) {
+  const tz = Session.getScriptTimeZone() || 'Asia/Bangkok';
+  return (prefix || 'L') + '-' + Utilities.formatDate(new Date(), tz, 'yyyyMMdd-HHmmss');
+}
+// key ระบุ "คน" ต่อหน่วยงาน (customer_id + email) — ใช้ join ระหว่างชีต Queue กับ Results
+function respKey_(cid, email) {
+  return String(cid == null ? '' : cid) + '|' + String(email == null ? '' : email).toLowerCase().trim();
+}
+
 // PHASE 2: ส่งคิวจริง — ส่งอีเมลถึงผู้รับในแถวคิวที่ status='queued' (อนุมัติโดยเจ้าของ 2026-06-25)
 // เคารพโควต้าจริงของ Gmail (MailApp.getRemainingDailyQuota) — ส่งจนหมดโควต้าแล้วหยุด ที่เหลือคงเป็น queued
 // อัปเดตสถานะรายแถว: sent / failed(+last_error,+retry_count). admin=ทุกแถว · customer=เฉพาะของตัวเอง
@@ -1005,6 +1027,7 @@ function sendQueuedRows_(opts) {
       const m = buildCampaignMail_({ email: email }, topicRow, { customer_id: cid });
       MailApp.sendEmail({ to: m.to, subject: m.subject, htmlBody: m.html, name: 'IT Support' });
       sheet.getRange(r + 1, idx.status + 1).setValue('sent');
+      if (idx.sent_at != null) sheet.getRange(r + 1, idx.sent_at + 1).setValue(new Date()); // เวลาส่งจริง (ใช้นับ 5 วันรีส่ง)
       remaining--; sent++;
     } catch (e) {
       const rc = Number(data[r][idx.retry_count] || 0) + 1;
@@ -1030,6 +1053,174 @@ function sendQueuedNow() {
     sent: res.sent, failed: res.failed, skipped: res.skipped,
     queue: listQueue(), dashboard: getDashboardData(), quota: computeQuota_(user)
   });
+}
+
+// core "รีส่งเมื่อครบกำหนด" — ใช้ร่วมทั้ง trigger รายชั่วโมง (อัตโนมัติ) และปุ่มมือ (resendDueNow)
+// เงื่อนไขรีส่งต่อ 1 คน: (1) เคยถูกส่งจริงแล้ว (มีแถว status='sent')
+//   (2) ยังไม่ตอบสนอง — ไม่มีผลใน Results (clicked/trained/passed/reported)
+//   (3) ครบ resend_after_days นับจากเวลาส่งล่าสุด  (4) ไม่มีแถว queued ค้างอยู่ (กันส่งซ้ำซ้อน)
+// รีส่งซ้ำได้เรื่อย ๆ ทุก N วันจนกว่าจะตอบสนอง (เพราะพอรีส่ง เวลาส่งล่าสุดขยับ → ครบกำหนดใหม่อีก N วัน)
+// เคารพโควต้าส่งต่อวัน (computeQuota_ = platform_daily_cap) · ไม่เรียก getCurrentUser_ (เรียกจาก trigger ได้)
+// opts.customerFilter: null = ทุกหน่วยงาน (trigger/admin) · ระบุ id = เฉพาะหน่วยงานนั้น
+function processResends_(opts) {
+  opts = opts || {};
+  const customerFilter = opts.customerFilter || null;
+  const days = Math.max(1, Number(getSettingValue_('resend_after_days', 5)) || 5);
+  const cutoffMs = days * 24 * 60 * 60 * 1000;
+  const now = new Date();
+
+  // คนที่ "ตอบสนองแล้ว" (คลิก/อบรม/ผ่าน/แจ้ง) — ไม่ต้องรีส่ง
+  const responded = {};
+  rows_(SHEETS.results).forEach(function (r) {
+    const a = String(r.action || '').toLowerCase();
+    if (a === 'clicked' || a === 'trained' || a === 'passed' || a === 'reported') {
+      responded[respKey_(r.customer_id, r.email)] = true;
+    }
+  });
+
+  // สแกน Queue: ต่อคน หา "เวลาส่งล่าสุด", มีแถวรอส่งค้างไหม, รอบรีส่งสูงสุด
+  const sheet = sheet_(SHEETS.queue);
+  const data = sheet.getDataRange().getValues();
+  const idx = {};
+  HEADERS.Queue.forEach(function (h, i) { idx[h] = i; });
+  const person = {};
+  for (let r = 1; r < data.length; r++) {
+    const cid = String(data[r][idx.customer_id]);
+    if (customerFilter && cid !== String(customerFilter)) continue;
+    const email = String(data[r][idx.email] || '');
+    if (!email) continue;
+    const key = respKey_(cid, email);
+    const status = String(data[r][idx.status] || '').toLowerCase();
+    const round = Number(data[r][idx.resend_round] || 0);
+    const p = person[key] || (person[key] = { cid: cid, email: email, lastSent: null, hasPending: false, maxRound: 0, topic: '' });
+    if (round > p.maxRound) p.maxRound = round;
+    if (status === 'queued') p.hasPending = true;
+    if (status === 'sent') {
+      // เวลาส่งล่าสุด: ใช้ sent_at ถ้ามี ไม่งั้น fallback เป็น send_date (แถวเก่าก่อนมีคอลัมน์นี้)
+      const raw = data[r][idx.sent_at] || data[r][idx.send_date];
+      const t = raw ? new Date(raw) : null;
+      if (t && !isNaN(t.getTime()) && (!p.lastSent || t.getTime() > p.lastSent.getTime())) p.lastSent = t;
+      p.topic = String(data[r][idx.topic] || p.topic);
+    }
+  }
+
+  // คัดคนที่ถึงกำหนดรีส่ง แยกตามหน่วยงาน (เพื่อ clamp โควต้าต่อหน่วยงาน)
+  const dueByCust = {};
+  Object.keys(person).forEach(function (key) {
+    const p = person[key];
+    if (responded[key]) return;      // ตอบสนองแล้ว → หยุด
+    if (p.hasPending) return;        // มีแถวรอส่งค้าง → ข้าม (กันซ้ำ)
+    if (!p.lastSent) return;         // ยังไม่เคยส่งจริง → ไม่มีอะไรให้รีส่ง
+    if (now.getTime() - p.lastSent.getTime() < cutoffMs) return; // ยังไม่ครบ N วัน
+    (dueByCust[p.cid] || (dueByCust[p.cid] = [])).push(p);
+  });
+
+  const batchId = newBatchId_('R'); // ล๊อตรีส่งรอบนี้
+  const rowsToAdd = [];
+  let dueTotal = 0, clampedOut = 0;
+  // available = โควต้าที่เหลือของทั้งแพลตฟอร์มวันนี้ (ใช้ร่วมทุกหน่วยงาน) — clamp จาก budget ก้อนเดียว
+  let budget = Math.max(0, computeQuota_({ customer_id: '' }).available);
+  Object.keys(dueByCust).forEach(function (cid) {
+    const list = dueByCust[cid];
+    dueTotal += list.length;
+    const take = list.slice(0, budget);         // เคารพโควต้ารวมวันนี้
+    budget -= take.length;
+    clampedOut += (list.length - take.length);
+    take.forEach(function (p) {
+      rowsToAdd.push([cid, p.email, p.topic || 'Awareness Training',
+        new Date(now.getTime() + randomInt_(1, 15) * 60000), 'queued', 0, '',
+        batchId, '', p.maxRound + 1]);
+    });
+  });
+
+  const createdRows = {};
+  if (rowsToAdd.length) {
+    const startRow = sheet.getLastRow() + 1;
+    sheet.getRange(startRow, 1, rowsToAdd.length, HEADERS.Queue.length).setValues(rowsToAdd);
+    for (let k = 0; k < rowsToAdd.length; k++) createdRows[startRow + k] = true;
+  }
+  let sent = 0, failed = 0, skipped = 0;
+  if (rowsToAdd.length) {
+    const res = sendQueuedRows_({ onlyRows: createdRows }); // ส่งเฉพาะแถวรีส่งที่เพิ่งสร้าง
+    sent = res.sent; failed = res.failed; skipped = res.skipped;
+  }
+  return { due: dueTotal, queued: rowsToAdd.length, clampedOut: clampedOut, sent: sent, failed: failed, skipped: skipped, batchId: rowsToAdd.length ? batchId : '' };
+}
+
+// ปุ่มมือ: ตรวจคนครบกำหนดแล้วรีส่งทันที (admin=ทุกหน่วยงาน · customer=เฉพาะของตัวเอง)
+function resendDueNow() {
+  setupDatabase();
+  const user = getCurrentUser_();
+  requireCustomer_(user);
+  const filter = user.role === 'customer' ? user.customer_id : null;
+  const res = processResends_({ customerFilter: filter });
+  logAction_('RESEND_DUE_NOW', 'OK', 'due=' + res.due + ' resent=' + res.sent + ' failed=' + res.failed + ' skipped=' + res.skipped);
+  return jsonSafe_({
+    ran: res,
+    queue: listQueue(), dashboard: getDashboardData(), quota: computeQuota_(user), results: listResults()
+  });
+}
+
+// ติ๊ก "แจ้งแล้ว = ผ่าน" — บันทึกผล action='reported' ให้คนที่ "แจ้งฟิชชิ่งแต่ไม่ได้คลิก"
+// เงื่อนไข: อนุญาตเฉพาะคนที่ "ยังไม่คลิก" (กันติ๊กผ่านให้คนที่พลาดคลิกไปแล้ว) · หยุดการรีส่งของคนนั้น
+// payload = { email }
+function markReported(payload) {
+  setupDatabase();
+  const user = getCurrentUser_();
+  requireCustomer_(user);
+  const email = String(payload && payload.email || '').toLowerCase().trim();
+  if (!email) throw new Error('ต้องระบุอีเมล');
+
+  // ต้องเป็นคนในลิสต์เป้าหมายของหน่วยงานผู้ใช้ (กันติ๊กอีเมลนอก scope)
+  const target = scopeRows_(rows_(SHEETS.emailList), 'customer_id', user)
+    .filter(function (t) { return String(t.email).toLowerCase().trim() === email; })[0];
+  if (!target) throw new Error('ไม่พบอีเมลนี้ในรายชื่อเป้าหมาย');
+  const cid = String(target.customer_id);
+
+  // ห้ามติ๊กผ่านให้คนที่คลิกลิงก์ไปแล้ว (ตามกติกา: ติ๊กได้เฉพาะคนที่ยังไม่คลิก)
+  const key = respKey_(cid, email);
+  const clicked = scopeRows_(rows_(SHEETS.results), 'customer_id', user).some(function (r) {
+    const a = String(r.action || '').toLowerCase();
+    return (a === 'clicked' || a === 'trained' || a === 'passed') && respKey_(r.customer_id, r.email) === key;
+  });
+  if (clicked) throw new Error('คนนี้คลิกลิงก์ไปแล้ว ติ๊ก "แจ้งแล้ว = ผ่าน" ไม่ได้');
+
+  // กันบันทึกซ้ำ
+  const already = scopeRows_(rows_(SHEETS.results), 'customer_id', user).some(function (r) {
+    return String(r.action || '').toLowerCase() === 'reported' && respKey_(r.customer_id, r.email) === key;
+  });
+  if (!already) {
+    sheet_(SHEETS.results).appendRow([cid, email, 'reported', new Date(), 'Reported phishing', '', target.fullname || '']);
+  }
+  logAction_('MARK_REPORTED', 'OK', email);
+  return jsonSafe_({ ok: true, queue: listQueue(), results: listResults(), dashboard: getDashboardData() });
+}
+
+// ยกเลิกติ๊ก "แจ้งแล้ว" — ลบแถวผล action='reported' ของอีเมลนั้น (แก้เคสติ๊กพลาด)
+function unmarkReported(payload) {
+  setupDatabase();
+  const user = getCurrentUser_();
+  requireCustomer_(user);
+  const email = String(payload && payload.email || '').toLowerCase().trim();
+  if (!email) throw new Error('ต้องระบุอีเมล');
+
+  const sheet = sheet_(SHEETS.results);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const ci = headers.indexOf('customer_id');
+  const ei = headers.indexOf('email');
+  const ai = headers.indexOf('action');
+  let removed = 0;
+  // ลบจากล่างขึ้นบน (index ไม่เลื่อน) · เฉพาะ scope ของผู้ใช้
+  for (let i = data.length - 1; i >= 1; i--) {
+    if (String(data[i][ai] || '').toLowerCase() !== 'reported') continue;
+    if (String(data[i][ei] || '').toLowerCase().trim() !== email) continue;
+    if (user.role !== 'admin' && String(data[i][ci]) !== user.customer_id) continue;
+    sheet.deleteRow(i + 1);
+    removed++;
+  }
+  logAction_('UNMARK_REPORTED', 'OK', email + ' removed=' + removed);
+  return jsonSafe_({ ok: true, removed: removed, queue: listQueue(), results: listResults(), dashboard: getDashboardData() });
 }
 
 function getSchedule() {
@@ -1099,7 +1290,17 @@ function setScheduleDay(payload) {
 // เป้าหมายของ trigger — รันทุกชั่วโมง: ประมวลผลตารางของ "วันนี้" เฉพาะแถวที่ "ถึงเวลาส่งแล้ว"
 // (Apps Script ส่ง event object เป็น arg แรกให้ handler เสมอ — จึงไม่ใช้ arg นั้น แล้วเรียก core แยก)
 function runDailySchedule() {
-  return processSchedule_(false);
+  const sched = processSchedule_(false);
+  // พ่วงตรวจ+รีส่งคนที่ครบกำหนด (ยังไม่คลิก + ยังไม่ถูกติ๊กว่าแจ้ง) ทุกหน่วยงาน
+  // 5 วันคุมด้วย resend_after_days อยู่แล้ว การเช็ครายชั่วโมงจึงไม่ยิงซ้ำก่อนครบกำหนด
+  let resend = { due: 0, queued: 0, sent: 0, failed: 0, skipped: 0 };
+  try {
+    resend = processResends_({});
+  } catch (e) {
+    logAction_('RUN_RESEND', 'ERROR', String(e && e.message || e));
+  }
+  logAction_('RUN_RESEND', 'OK', 'due=' + resend.due + ' resent=' + resend.sent + ' skipped=' + resend.skipped);
+  return { schedule: sched, resend: resend };
 }
 
 // core ประมวลผลตาราง — force=false: ส่งเฉพาะแถวที่เวลาถึงแล้ว (เทียบ time) · force=true: ส่งทุกแถวของวันนี้ทันที (ปุ่มทดสอบ)
@@ -1180,10 +1381,11 @@ function createQueueForCustomer_(customerId, count, emailsList) {
   const sheet = sheet_(SHEETS.queue);
   const add = [];
   const now = new Date();
+  const batchId = newBatchId_('L'); // ล๊อต schedule รอบนี้ใช้รหัสเดียวกัน
   targets.slice(0, n).forEach(function (t, i) {
     const topic = topics.length ? topics[i % topics.length] : null;
     add.push([customerId, t.email, topic ? topic.topic : 'Awareness Training',
-      new Date(now.getTime() + randomInt_(5, 180) * 60000), 'queued', 0, '']);
+      new Date(now.getTime() + randomInt_(5, 180) * 60000), 'queued', 0, '', batchId, '', 0]);
   });
   const startRow = sheet.getLastRow() + 1;
   if (add.length) sheet.getRange(startRow, 1, add.length, HEADERS.Queue.length).setValues(add);
@@ -1605,7 +1807,8 @@ function seedSettings_() {
     ['auto_reduce_sequence', '10,5,1,pause', 'Daily quota reduction when delivery risk occurs'],
     ['platform_daily_cap', QUOTA_DEFAULTS.platformDailyCap, 'Platform-wide send cap per day (Gmail free = 100)'],
     ['customer_daily_cap', QUOTA_DEFAULTS.customerDailyCap, 'Max sends per customer per day (fair-share ceiling)'],
-    ['monthly_repeat', 'false', 'Phase 1 setting only']
+    ['monthly_repeat', 'false', 'Phase 1 setting only'],
+    ['resend_after_days', 5, 'Re-send simulation after N days if target did not click and was not marked reported']
   ].filter(function (row) { return !existing[row[0]]; });
   if (defaults.length) sheet_(SHEETS.settings).getRange(sheet_(SHEETS.settings).getLastRow() + 1, 1, defaults.length, 3).setValues(defaults);
 }
