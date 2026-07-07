@@ -288,6 +288,14 @@
       border-radius: var(--radius-sm);
     }
 
+    /* ลากขยาย/ย่อความสูงด้วยเมาส์ (ที่จับมุมขวาล่าง) */
+    .table-wrap.resizable {
+      resize: vertical;
+      height: 470px;
+      max-height: none;
+      min-height: 140px;
+    }
+
     .tabs-note, .muted {
       color: var(--muted);
       font-size: 12px;
@@ -761,7 +769,7 @@
               <button class="btn" onclick="sendQueue()" ${queuedCount > 0 ? '' : 'disabled'}>✉ ส่งคิวจริง (${queuedCount} รายการรอส่ง)</button>
               <span id="sendQueueMsg" class="muted"></span>
             </div>
-            <div class="table-wrap">${tableHtml(state.data.queue, ['customer_id','email','topic','send_date','status','retry_count','last_error'])}</div>
+            <div class="table-wrap resizable">${tableHtml(state.data.queue, ['customer_id','email','topic','send_date','status','retry_count','last_error'])}</div>
           </div>
         </div>
       `;
