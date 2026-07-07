@@ -288,13 +288,34 @@
       border-radius: var(--radius-sm);
     }
 
-    /* ลากขยาย/ย่อความสูงด้วยเมาส์ (ที่จับมุมขวาล่าง) */
+    /* ตารางที่ลากปรับความสูงได้ (คู่กับ .resize-handle ด้านล่าง) */
     .table-wrap.resizable {
-      resize: vertical;
       height: 470px;
       max-height: none;
       min-height: 140px;
     }
+
+    /* แถบที่จับสำหรับลากปรับความสูง — รองรับทั้งเมาส์และนิ้ว */
+    .resize-handle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 18px;
+      margin-top: -1px;
+      border: 1px solid var(--line);
+      border-top: none;
+      border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+      background: var(--soft);
+      color: var(--muted);
+      cursor: ns-resize;
+      font-size: 12px;
+      line-height: 1;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none; /* กันหน้าจอเลื่อนตอนลากด้วยนิ้ว */
+    }
+    .resize-handle:hover { background: var(--green); }
+    .resize-handle.dragging { background: var(--green-2); color: #fff; }
 
     .tabs-note, .muted {
       color: var(--muted);
@@ -769,7 +790,9 @@
               <button class="btn" onclick="sendQueue()" ${queuedCount > 0 ? '' : 'disabled'}>✉ ส่งคิวจริง (${queuedCount} รายการรอส่ง)</button>
               <span id="sendQueueMsg" class="muted"></span>
             </div>
-            <div class="table-wrap resizable">${tableHtml(state.data.queue, ['customer_id','email','topic','send_date','status','retry_count','last_error'])}</div>
+            <div class="table-wrap resizable" id="queueTableWrap">${tableHtml(state.data.queue, ['customer_id','email','topic','send_date','status','retry_count','last_error'])}</div>
+            <div class="resize-handle" title="ลาก (เมาส์หรือนิ้ว) เพื่อปรับความสูงตาราง"
+                 onpointerdown="startQueueResize(event)">⣿ ลากปรับความสูง</div>
           </div>
         </div>
       `;
@@ -1748,6 +1771,33 @@
         })
         .withFailureHandler((err) => setMsg('emailMsg', err.message || String(err), true))
         .addEmailTargets({ text });
+    }
+
+    // ลากปรับความสูงตาราง "คิวทั้งหมด" — Pointer Events รองรับทั้งเมาส์และนิ้ว
+    function startQueueResize(e) {
+      const wrap = document.getElementById('queueTableWrap');
+      if (!wrap) return;
+      e.preventDefault();
+      const handle = e.currentTarget;
+      const startY = e.clientY;
+      const startH = wrap.getBoundingClientRect().height;
+      const MIN = 140;
+      handle.classList.add('dragging');
+      try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+      const move = (ev) => {
+        const h = Math.max(MIN, startH + (ev.clientY - startY));
+        wrap.style.height = h + 'px';
+      };
+      const stop = () => {
+        handle.classList.remove('dragging');
+        try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
+        handle.removeEventListener('pointermove', move);
+        handle.removeEventListener('pointerup', stop);
+        handle.removeEventListener('pointercancel', stop);
+      };
+      handle.addEventListener('pointermove', move);
+      handle.addEventListener('pointerup', stop);
+      handle.addEventListener('pointercancel', stop);
     }
 
     function createQueue() {
